@@ -1,6 +1,9 @@
 import type { ContainerKind, ContentContainer, SiteId } from "../core/types";
 import { hasHeadings } from "../parsing/heading-dom";
 import { isManagedNode } from "../utils/dom";
+import { isEditableElement, isVisibleElement } from "../utils/visibility";
+
+const EXCLUDED_CONTENT_CONTEXT = ".ghcm-root, nav, [role='navigation'], aside, header, footer, button, a, summary, [role='button']";
 
 export function getLocationPageKey(location: Location): string {
   return `${location.hostname}${location.pathname}${location.search}`;
@@ -9,10 +12,10 @@ export function getLocationPageKey(location: Location): string {
 export function queryContentCandidates(
   document: Document,
   selector: string,
-  excludeSelector = ".ghcm-root, nav, aside, header, footer"
+  excludeSelector = EXCLUDED_CONTENT_CONTEXT
 ): HTMLElement[] {
   const candidates = Array.from(document.querySelectorAll<HTMLElement>(selector))
-    .filter((element) => !element.closest(excludeSelector))
+    .filter((element) => !element.closest(excludeSelector) && !isEditableElement(element) && isVisibleElement(element))
     .filter((element) => hasHeadings(element));
 
   return candidates.filter((element) => !candidates.some((other) => other !== element && element.contains(other)));
@@ -42,7 +45,7 @@ export function buildContentContainers(
 export function findFirstContentCandidate(
   document: Document,
   selector: string,
-  excludeSelector = ".ghcm-root, nav, aside, header, footer"
+  excludeSelector = EXCLUDED_CONTENT_CONTEXT
 ): HTMLElement | null {
   return queryContentCandidates(document, selector, excludeSelector)[0] ?? null;
 }
@@ -59,12 +62,22 @@ export function shouldRefreshForContentMutation(
   mutation: MutationRecord,
   contentRootSelector: string
 ): boolean {
-  if (mutation.type !== "childList") {
+  const target = mutation.target instanceof HTMLElement ? mutation.target : mutation.target.parentElement;
+  if (target?.closest(".ghcm-root, .ghcm-dock-row")) {
     return false;
   }
 
-  const target = mutation.target instanceof HTMLElement ? mutation.target : null;
-  if (target?.closest(".ghcm-root")) {
+  if (mutation.type === "characterData") {
+    return Boolean(target?.closest(contentRootSelector) && !target.closest(".ghcm-heading-toggle"));
+  }
+
+  if (mutation.type === "attributes") {
+    return Boolean(target && !isManagedNode(target) && (
+      target.closest(contentRootSelector) || target.querySelector(contentRootSelector)
+    ));
+  }
+
+  if (mutation.type !== "childList") {
     return false;
   }
 

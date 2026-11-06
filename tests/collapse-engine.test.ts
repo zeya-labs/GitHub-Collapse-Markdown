@@ -5,6 +5,41 @@ import type { ContentContainer } from "../src/core/types";
 import { HeadingControls } from "../src/ui/heading-controls";
 
 describe("CollapseEngine", () => {
+  it("keeps collapsed ancestry inside each independent content container", () => {
+    document.body.innerHTML = `
+      <article id="first-container">
+        <h1 id="first">First document</h1>
+        <p>First document content</p>
+      </article>
+      <article id="second-container">
+        <h2 id="second">Second document</h2>
+        <p>Second document content</p>
+        <h3 id="nested">Nested section</h3>
+        <p>Nested content</p>
+      </article>
+    `;
+    const containers: ContentContainer[] = ["first", "second"].map((id) => ({
+      key: id,
+      label: id,
+      kind: "markdown",
+      element: document.getElementById(`${id}-container`) as HTMLElement
+    }));
+    const pageDocument = buildDocument(containers);
+    const [first, second, nested] = pageDocument.headings;
+    const engine = new CollapseEngine(pageDocument, [first.key]);
+
+    expect(engine.getState(second.key).hiddenByAncestor).toBe(false);
+    expect(engine.getState(nested.key).hiddenByAncestor).toBe(false);
+
+    engine.toggle(second.key);
+    expect(engine.getState(second.key).hiddenByAncestor).toBe(false);
+    expect(engine.getState(nested.key).hiddenByAncestor).toBe(true);
+
+    engine.expandTo(nested.key);
+    expect(engine.getState(first.key).collapsed).toBe(true);
+    expect(engine.getState(nested.key).hiddenByAncestor).toBe(false);
+  });
+
   it("hides descendant headings when the parent is collapsed", () => {
     document.body.innerHTML = `
       <article class="markdown-body">

@@ -5,6 +5,7 @@ import { PageDocument } from "../core/page-document";
 import type { HeadingSnapshot, SiteAdapter } from "../core/types";
 import { HeadingControls } from "../ui/heading-controls";
 import { PanelUI } from "../ui/panel";
+import { isUsablePanelHost } from "../ui/panel-placement";
 import type { PanelRenderState } from "../ui/panel-outline";
 import { scrollToElementWithOffset } from "../utils/dom";
 
@@ -34,7 +35,7 @@ export class PageSessionUI {
       onExpandAll: this.options.onExpandAll,
       onJump: (key) => this.jumpToHeading(key),
       resolveDockedLayout: () => this.options.adapter.getDockedPanelLayout?.(document) ?? null,
-      resolveInlineHost: () => this.options.document.getPrimaryContainerElement()
+      resolveInlineHost: () => this.options.document.getContainerElements().find(isUsablePanelHost) ?? null
     });
     this.activeHeading = new ActiveHeadingTracker({
       getStickyTop: () => this.options.adapter.getStickyHeaderOffset(document),
@@ -66,6 +67,10 @@ export class PageSessionUI {
 
   togglePanel(): void {
     this.panel.setOpen(!this.panel.isOpen());
+  }
+
+  refreshLayout(): void {
+    this.panel.refreshLayout();
   }
 
   renderSnapshots(

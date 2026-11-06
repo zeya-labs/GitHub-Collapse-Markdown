@@ -1,4 +1,8 @@
 import type { DockedPanelLayoutContext } from "../core/types";
+import { isEditableElement, isVisibleElement } from "../utils/visibility";
+
+const UNSAFE_PANEL_CONTEXT_SELECTOR = ".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']";
+const INVALID_PANEL_HOST_TAGS = new Set(["P", "SPAN", "PRE", "CODE", "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "UL", "OL", "DL"]);
 
 export type PanelPlacement = "overlay" | "docked" | "inline";
 
@@ -13,12 +17,8 @@ export interface PanelPlacementResolvers {
 }
 
 export function resolvePanelPlacement(desktop: boolean, resolvers: PanelPlacementResolvers): ResolvedPanelPlacement {
-  if (!desktop) {
-    return { kind: "overlay" };
-  }
-
-  const dockedLayout = resolvers.resolveDockedLayout?.() ?? null;
-  if (dockedLayout) {
+  const dockedLayout = desktop ? resolvers.resolveDockedLayout?.() ?? null : null;
+  if (dockedLayout && isUsablePanelHost(dockedLayout.host)) {
     return {
       kind: "docked",
       context: dockedLayout
@@ -26,7 +26,7 @@ export function resolvePanelPlacement(desktop: boolean, resolvers: PanelPlacemen
   }
 
   const inlineHost = resolvers.resolveInlineHost?.() ?? null;
-  if (inlineHost) {
+  if (inlineHost && isUsablePanelHost(inlineHost)) {
     return {
       kind: "inline",
       host: inlineHost
@@ -34,6 +34,11 @@ export function resolvePanelPlacement(desktop: boolean, resolvers: PanelPlacemen
   }
 
   return { kind: "overlay" };
+}
+
+export function isUsablePanelHost(element: HTMLElement): boolean {
+  return !INVALID_PANEL_HOST_TAGS.has(element.tagName) && !element.closest(UNSAFE_PANEL_CONTEXT_SELECTOR) &&
+    !isEditableElement(element) && isVisibleElement(element);
 }
 
 export function collectPlacementTargets(placement: ResolvedPanelPlacement): HTMLElement[] {

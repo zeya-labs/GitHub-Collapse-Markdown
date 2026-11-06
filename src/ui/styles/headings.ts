@@ -102,4 +102,9 @@ export const headingStyles = `
   .ghcm-heading-block--wrapped .heading-element > .ghcm-heading-toggle:hover {
     transform: translateY(-1px);
   }
+
+  .ghcm-section-hidden,
+  .ghcm-hidden-by-parent {
+    display: none !important;
+  }
 `;

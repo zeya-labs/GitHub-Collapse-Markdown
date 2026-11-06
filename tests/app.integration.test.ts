@@ -99,7 +99,8 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     expect(document.querySelector(".ghcm-root")?.classList.contains("is-docked")).toBe(true);
     expect(document.querySelector(".ghcm-dock-row")?.classList.contains("BorderGrid-row")).toBe(true);
     expect(document.querySelector(".ghcm-dock-cell")?.classList.contains("BorderGrid-cell")).toBe(true);
-    expect(document.querySelector(".BorderGrid > .BorderGrid-row")?.classList.contains("ghcm-preceding-dock-row")).toBe(true);
+    expect(document.querySelector(".BorderGrid > .BorderGrid-row")?.className).toBe("BorderGrid-row");
+    expect(document.querySelector(".ghcm-backdrop")).toBeNull();
     const firstWrappedHeading = document.querySelector(".markdown-heading") as HTMLElement;
     const firstHeadingElement = firstWrappedHeading.querySelector(".heading-element") as HTMLElement;
     expect(firstHeadingElement.firstElementChild?.classList.contains("ghcm-heading-toggle")).toBe(true);
@@ -121,8 +122,19 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     expect(root.parentElement).toBe(inlineHost);
     expect(inlineHost.firstElementChild).toBe(root);
     expect(document.querySelector(".ghcm-sidebar-kicker")?.tagName).toBe("DIV");
-    expect(document.querySelector(".ghcm-panel")?.classList.contains("is-open")).toBe(true);
+    const panel = document.querySelector(".ghcm-panel") as HTMLElement;
+    const trigger = document.querySelector(".ghcm-trigger") as HTMLButtonElement;
+    expect(panel.hidden).toBe(true);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(document.querySelector(".ghcm-dock-row")).toBeFalsy();
+
+    dispatchClick(trigger);
+    expect(panel.hidden).toBe(false);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+
+    dispatchClick(document.querySelector(".ghcm-close-action") as HTMLElement);
+    expect(panel.hidden).toBe(true);
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("prefers the pane wrapper bottom over the min-content pane when clamping the docked panel", () => {
@@ -403,8 +415,8 @@ describe("GitHubCollapseMarkdownApp integration", () => {
 
     expect(root.classList.contains("is-floating")).toBe(true);
     expect(root.style.getPropertyValue("--ghcm-panel-height")).toBe("360px");
-    expect(parseFloat(root.style.getPropertyValue("--ghcm-panel-max-height"))).toBeCloseTo(823, 5);
-    expect(parseFloat(root.style.getPropertyValue("--ghcm-panel-top"))).toBeCloseTo(47, 5);
+    expect(parseFloat(root.style.getPropertyValue("--ghcm-panel-max-height"))).toBeCloseTo(788, 5);
+    expect(parseFloat(root.style.getPropertyValue("--ghcm-panel-top"))).toBeCloseTo(82, 5);
   });
 
   it("collapses the target section when a heading is clicked", () => {
@@ -561,28 +573,42 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     await sleep(180);
 
     expect(document.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(6);
-    expect(document.querySelector(".ghcm-trigger")).toBeTruthy();
+    expect(document.querySelectorAll(".ghcm-trigger")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-panel")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-dock-row")).toHaveLength(1);
   });
 
-  it("updates outline text without remounting when only heading display text changes", async () => {
-    document.body.innerHTML = githubReadmePageFixture;
+  it.each(["replaceChild", "nodeValue"] as const)(
+    "updates outline text without remounting when heading text changes through %s",
+    async (updateMethod) => {
+      document.body.innerHTML = githubReadmePageFixture;
 
-    const mountSpy = vi.spyOn(PageSession.prototype, "mount");
-    const destroySpy = vi.spyOn(PageSession.prototype, "destroy");
+      const mountSpy = vi.spyOn(PageSession.prototype, "mount");
+      const destroySpy = vi.spyOn(PageSession.prototype, "destroy");
 
-    app = new GitHubCollapseMarkdownApp();
-    app.start();
+      app = new GitHubCollapseMarkdownApp();
+      app.start();
 
-    const supportHeading = Array.from(document.querySelectorAll("h2"))
-      .find((heading) => heading.textContent?.includes("Support")) as HTMLElement;
-    const headingTextNode = Array.from(supportHeading.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
-    supportHeading.replaceChild(document.createTextNode("Community Support"), headingTextNode as ChildNode);
-    await sleep(180);
+      const supportHeading = Array.from(document.querySelectorAll("h2"))
+        .find((heading) => heading.textContent?.includes("Support")) as HTMLElement;
+      const headingTextNode = Array.from(supportHeading.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+      const originalToggle = supportHeading.querySelector(".ghcm-heading-toggle");
+      if (updateMethod === "replaceChild") {
+        supportHeading.replaceChild(document.createTextNode("Community Support"), headingTextNode as ChildNode);
+      } else {
+        headingTextNode!.nodeValue = "Community Support";
+      }
+      await sleep(180);
 
-    expect(document.querySelector(".ghcm-outline")?.textContent).toContain("Community Support");
-    expect(mountSpy).toHaveBeenCalledTimes(1);
-    expect(destroySpy).not.toHaveBeenCalled();
-  });
+      expect(document.querySelector(".ghcm-outline")?.textContent).toContain("Community Support");
+      dispatchClick(supportHeading);
+      expect(document.querySelector(".ghcm-outline")?.textContent).toContain("Community Support");
+      expect(supportHeading.querySelector(".ghcm-heading-toggle")).toBe(originalToggle);
+      expect(mountSpy).toHaveBeenCalledTimes(1);
+      expect(destroySpy).not.toHaveBeenCalled();
+    }
+  );
 
   it("injects a single toggle per heading when GitHub issue bodies nest markdown-body containers", () => {
     document.body.innerHTML = githubIssueBodyNestedMarkdownFixture;
@@ -594,7 +620,7 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     expect(document.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(2);
   });
 
-  it("uses a drawer trigger on mobile screens", () => {
+  it("embeds collapsed contents in the markdown on mobile screens", () => {
     setViewportWidth(390);
     document.body.innerHTML = githubReadmePageFixture;
 
@@ -603,13 +629,19 @@ describe("GitHubCollapseMarkdownApp integration", () => {
 
     expect(document.querySelector(".ghcm-panel")?.classList.contains("is-open")).toBe(false);
     expect(document.querySelector(".ghcm-trigger")?.classList.contains("is-hidden")).toBe(false);
-    expect(document.querySelector(".ghcm-root")?.parentElement).toBe(document.body);
+    const root = document.querySelector(".ghcm-root") as HTMLElement;
+    const article = document.querySelector(".markdown-body") as HTMLElement;
+    expect(root.classList.contains("is-inline")).toBe(true);
+    expect(root.parentElement).toBe(article);
+    expect(article.firstElementChild).toBe(root);
+    expect(document.querySelector(".ghcm-backdrop")).toBeNull();
+    expect(document.querySelector("[aria-modal='true']")).toBeNull();
 
     dispatchClick(document.querySelector(".ghcm-trigger") as HTMLElement);
     expect(document.querySelector(".ghcm-panel")?.classList.contains("is-open")).toBe(true);
   });
 
-  it("closes the mobile drawer after jumping from the outline", () => {
+  it("keeps embedded mobile contents open after jumping from the outline", () => {
     setViewportWidth(390);
     document.body.innerHTML = githubReadmePageFixture;
 
@@ -619,7 +651,105 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     dispatchClick(document.querySelector(".ghcm-trigger") as HTMLElement);
     dispatchClick(document.querySelector(".ghcm-outline-link") as HTMLElement);
 
-    expect(document.querySelector(".ghcm-panel")?.classList.contains("is-open")).toBe(false);
+    expect(document.querySelector(".ghcm-panel")?.classList.contains("is-open")).toBe(true);
     expect(window.scrollTo).toHaveBeenCalled();
+  });
+
+  it("activates a markdown preview when it becomes visible and cleans up when it is hidden again", async () => {
+    document.body.innerHTML = `
+      <main>
+        <textarea aria-label="Comment source">## Preview heading</textarea>
+        <div data-testid="markdown-preview" id="comment-preview" hidden>
+          <div class="markdown-body">
+            <h2 id="preview-heading">Preview heading</h2>
+            <p>Rendered preview content</p>
+          </div>
+        </div>
+      </main>
+    `;
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+    const preview = document.getElementById("comment-preview") as HTMLElement;
+
+    expect(document.querySelector(".ghcm-root")).toBeNull();
+    expect(document.querySelector(".ghcm-heading-toggle")).toBeNull();
+
+    preview.hidden = false;
+    await sleep(180);
+
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+    expect(preview.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(1);
+    expect(document.querySelector(".ghcm-outline")?.textContent).toContain("Preview heading");
+
+    preview.hidden = true;
+    await sleep(180);
+
+    expect(document.querySelector(".ghcm-root")).toBeNull();
+    expect(document.querySelector(".ghcm-heading-toggle")).toBeNull();
+
+    preview.hidden = false;
+    await sleep(180);
+
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-panel")).toHaveLength(1);
+    expect(preview.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(1);
+  });
+
+  it("moves between a hidden sidebar and inline contents without rebuilding heading controls", async () => {
+    document.body.innerHTML = githubReadmePageFixture;
+    const mountSpy = vi.spyOn(PageSession.prototype, "mount");
+    const destroySpy = vi.spyOn(PageSession.prototype, "destroy");
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+
+    const root = document.querySelector(".ghcm-root") as HTMLElement;
+    const toggle = document.querySelector(".ghcm-heading-toggle");
+    const sidebar = document.querySelector(".prc-PageLayout-PaneWrapper-pHPop") as HTMLElement;
+    const article = document.querySelector(".markdown-body") as HTMLElement;
+    const originalSidebarRow = sidebar.querySelector(".BorderGrid-row") as HTMLElement;
+    expect(root.classList.contains("is-docked")).toBe(true);
+
+    sidebar.hidden = true;
+    await sleep(180);
+
+    expect(root.classList.contains("is-inline")).toBe(true);
+    expect(root.parentElement).toBe(article);
+    expect(document.querySelector(".ghcm-heading-toggle")).toBe(toggle);
+    expect(document.querySelector(".ghcm-dock-row")).toBeNull();
+
+    sidebar.hidden = false;
+    await sleep(180);
+
+    expect(root.classList.contains("is-docked")).toBe(true);
+    expect(root.closest(".BorderGrid")).toBe(sidebar.querySelector(".BorderGrid"));
+    expect(document.querySelector(".ghcm-heading-toggle")).toBe(toggle);
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-panel")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-dock-row")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(6);
+    expect(originalSidebarRow.className).toBe("BorderGrid-row");
+    expect(mountSpy).toHaveBeenCalledTimes(1);
+    expect(destroySpy).not.toHaveBeenCalled();
+  });
+
+  it("reuses a single panel and its controls across desktop and mobile placement changes", () => {
+    document.body.innerHTML = githubReadmePageFixture;
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+    const root = document.querySelector(".ghcm-root") as HTMLElement;
+    const toggle = document.querySelector(".ghcm-heading-toggle");
+
+    for (const width of [390, 1400, 390, 1400]) {
+      setViewportWidth(width);
+      window.dispatchEvent(new Event("resize"));
+
+      expect(root.classList.contains(width < 1180 ? "is-inline" : "is-docked")).toBe(true);
+      expect(document.querySelector(".ghcm-root")).toBe(root);
+      expect(document.querySelector(".ghcm-heading-toggle")).toBe(toggle);
+      expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+      expect(document.querySelectorAll(".ghcm-panel")).toHaveLength(1);
+      expect(document.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(6);
+      expect(document.querySelectorAll(".ghcm-dock-row")).toHaveLength(width < 1180 ? 0 : 1);
+    }
   });
 });

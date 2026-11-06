@@ -16,8 +16,10 @@ const banner = `// ==UserScript==
 // @license     MIT
 // @author      Xyea
 // @namespace   https://github.com/Xyea/GitHub-Collapse-Markdown
-// @homepageURL https://github.com/Xyea/GitHub-Collapse-Markdown
-// @supportURL  https://github.com/Xyea/GitHub-Collapse-Markdown/issues
+// @homepageURL https://github.com/zeya-labs/GitHub-Collapse-Markdown
+// @supportURL  https://github.com/zeya-labs/GitHub-Collapse-Markdown/issues
+// @updateURL   https://raw.githubusercontent.com/zeya-labs/GitHub-Collapse-Markdown/main/main.js
+// @downloadURL https://raw.githubusercontent.com/zeya-labs/GitHub-Collapse-Markdown/main/main.js
 // @match       https://github.com/*
 // @match       https://gist.github.com/*
 // @match       https://help.github.com/*

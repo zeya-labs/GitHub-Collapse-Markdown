@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name        GitHub Collapse Markdown
-// @version     5.1.0
+// @version     5.2.0
 // @description GitHub Markdown 标题折叠脚本，支持大纲、状态记忆与现代 GitHub 页面
 // @license     MIT
 // @author      Xyea
 // @namespace   https://github.com/Xyea/GitHub-Collapse-Markdown
-// @homepageURL https://github.com/Xyea/GitHub-Collapse-Markdown
-// @supportURL  https://github.com/Xyea/GitHub-Collapse-Markdown/issues
+// @homepageURL https://github.com/zeya-labs/GitHub-Collapse-Markdown
+// @supportURL  https://github.com/zeya-labs/GitHub-Collapse-Markdown/issues
+// @updateURL   https://raw.githubusercontent.com/zeya-labs/GitHub-Collapse-Markdown/main/main.js
+// @downloadURL https://raw.githubusercontent.com/zeya-labs/GitHub-Collapse-Markdown/main/main.js
 // @match       https://github.com/*
 // @match       https://gist.github.com/*
 // @match       https://help.github.com/*
@@ -81,11 +83,14 @@
   }
 
   // src/utils/dom.ts
+  function getPreferredScrollBehavior() {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth";
+  }
   function scrollToElementWithOffset(element, offset) {
     const top = element.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({
       top: Math.max(top, 0),
-      behavior: "smooth"
+      behavior: getPreferredScrollBehavior()
     });
   }
   function isInteractiveTarget(target) {
@@ -113,12 +118,39 @@
     return normalizeWhitespace(window.getSelection?.()?.toString() ?? "");
   }
 
+  // src/utils/visibility.ts
+  var HIDDEN_CONTEXT_SELECTOR = "[hidden], [aria-hidden='true'], [inert], template, details:not([open])";
+  var EDITABLE_CONTEXT_SELECTOR = "textarea, input, select, [contenteditable]:not([contenteditable='false']), [role='textbox']";
+  function isVisibleElement(element) {
+    if (!element.isConnected || element.closest(HIDDEN_CONTEXT_SELECTOR)) {
+      return false;
+    }
+    const view = element.ownerDocument.defaultView;
+    if (!view) {
+      return false;
+    }
+    for (let current = element; current; current = current.parentElement) {
+      const style = view.getComputedStyle(current);
+      if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" || style.contentVisibility === "hidden") {
+        return false;
+      }
+    }
+    if (element.ownerDocument.documentElement.clientWidth > 0 && view.getComputedStyle(element).display !== "contents" && element.getBoundingClientRect().width <= 0) {
+      return false;
+    }
+    return true;
+  }
+  function isEditableElement(element) {
+    return Boolean(element.closest(EDITABLE_CONTEXT_SELECTOR));
+  }
+
   // src/adapters/shared.ts
+  var EXCLUDED_CONTENT_CONTEXT = ".ghcm-root, nav, [role='navigation'], aside, header, footer, button, a, summary, [role='button']";
   function getLocationPageKey(location) {
     return `${location.hostname}${location.pathname}${location.search}`;
   }
-  function queryContentCandidates(document2, selector, excludeSelector = ".ghcm-root, nav, aside, header, footer") {
-    const candidates = Array.from(document2.querySelectorAll(selector)).filter((element) => !element.closest(excludeSelector)).filter((element) => hasHeadings(element));
+  function queryContentCandidates(document2, selector, excludeSelector = EXCLUDED_CONTENT_CONTEXT) {
+    const candidates = Array.from(document2.querySelectorAll(selector)).filter((element) => !element.closest(excludeSelector) && !isEditableElement(element) && isVisibleElement(element)).filter((element) => hasHeadings(element));
     return candidates.filter((element) => !candidates.some((other) => other !== element && element.contains(other)));
   }
   function buildContentContainers(siteId, candidates, describe) {
@@ -133,7 +165,7 @@
       };
     });
   }
-  function findFirstContentCandidate(document2, selector, excludeSelector = ".ghcm-root, nav, aside, header, footer") {
+  function findFirstContentCandidate(document2, selector, excludeSelector = EXCLUDED_CONTENT_CONTEXT) {
     return queryContentCandidates(document2, selector, excludeSelector)[0] ?? null;
   }
   function describeStaticContainer(id, label, kind) {
@@ -144,11 +176,17 @@
     });
   }
   function shouldRefreshForContentMutation(mutation, contentRootSelector) {
-    if (mutation.type !== "childList") {
+    const target = mutation.target instanceof HTMLElement ? mutation.target : mutation.target.parentElement;
+    if (target?.closest(".ghcm-root, .ghcm-dock-row")) {
       return false;
     }
-    const target = mutation.target instanceof HTMLElement ? mutation.target : null;
-    if (target?.closest(".ghcm-root")) {
+    if (mutation.type === "characterData") {
+      return Boolean(target?.closest(contentRootSelector) && !target.closest(".ghcm-heading-toggle"));
+    }
+    if (mutation.type === "attributes") {
+      return Boolean(target && !isManagedNode(target) && (target.closest(contentRootSelector) || target.querySelector(contentRootSelector)));
+    }
+    if (mutation.type !== "childList") {
       return false;
     }
     const changedNodes = [...Array.from(mutation.addedNodes), ...Array.from(mutation.removedNodes)];
@@ -225,7 +263,7 @@
     findContainers(document2) {
       return buildContentContainers(
         "gist",
-        queryContentCandidates(document2, GIST_CONTENT_ROOT_SELECTOR, ".ghcm-root"),
+        queryContentCandidates(document2, GIST_CONTENT_ROOT_SELECTOR),
         (_element, index) => ({
           id: index === 0 ? "gist" : `gist:${index + 1}`,
           label: index === 0 ? "Gist" : `Gist Section ${index + 1}`,
@@ -247,44 +285,43 @@
   var ISSUE_BODY_SELECTOR = "[data-testid='issue-body']";
   var PR_BODY_SELECTOR = "[id^='pullrequest-']";
   var COMMENT_SELECTOR = "[id^='issuecomment-']";
-  var WIKI_PATH_SEGMENT = "/wiki/";
   var STICKY_HEADER_SELECTOR = [
     "header[role='banner']",
     ".AppHeader",
-    ".Header",
-    ".prc-PageLayout-Header-0of-R"
+    ".Header"
   ].join(", ");
-  var GITHUB_CONTENT_ROOT_SELECTOR = [
-    "#readme .markdown-body",
-    ".comment-body.markdown-body",
-    ".js-comment-body.comment-body.markdown-body",
-    ".markdown-body"
-  ].join(", ");
+  var GITHUB_CONTENT_ROOT_SELECTOR = ".markdown-body, [data-testid='markdown-body'], [data-testid='markdown-preview']";
   var GITHUB_DOCK_HOST_SELECTORS = [
     "rails-partial[data-partial-name='codeViewRepoRoute.Sidebar'] .BorderGrid",
     "rails-partial[data-partial-name='codeViewRepoRoute.Sidebar']",
-    "[class*='PageLayout-Pane'] [data-partial-name='codeViewRepoRoute.Sidebar'] .BorderGrid",
     ".Layout-sidebar .BorderGrid",
-    ".Layout-sidebar"
+    ".Layout-sidebar",
+    "[data-testid='issue-metadata-pane']",
+    "[data-testid='discussion-sidebar']",
+    ".discussion-sidebar",
+    "#wiki-rightbar"
   ];
   var GITHUB_DOCK_BOUNDARY_SELECTORS = [
     "[class*='PageLayout-PaneWrapper']",
     "[class*='PageLayout-Pane-']",
-    ".Layout-sidebar"
+    ".Layout-sidebar",
+    "[data-testid='issue-metadata-pane']",
+    "[data-testid='discussion-sidebar']",
+    ".discussion-sidebar",
+    "#wiki-rightbar"
   ];
   function isGitHubRootHomePath(location) {
     return location.pathname === "/";
   }
   function isGitHubWikiPath(location) {
-    return location.pathname.includes(WIKI_PATH_SEGMENT);
+    return /\/wiki(?:\/|$)/.test(location.pathname);
   }
   function describeGitHubContainer(element, location) {
     if (element.closest(README_SELECTOR)) {
       return {
         id: "readme",
         kind: "markdown",
-        label: "README",
-        variant: null
+        label: "README"
       };
     }
     const comment = element.closest(COMMENT_SELECTOR);
@@ -293,38 +330,80 @@
         id: `comment:${comment.id.replace(/^issuecomment-/, "")}`,
         kind: "comment",
         label: "Comment",
-        variant: "comment"
+        numbered: true
+      };
+    }
+    const discussionComment = element.closest("[id^='discussioncomment-']");
+    if (discussionComment?.id) {
+      return {
+        id: `discussion-comment:${discussionComment.id.replace(/^discussioncomment-/, "")}`,
+        kind: "comment",
+        label: "Discussion comment",
+        numbered: true
+      };
+    }
+    const reviewComment = element.closest("[id^='discussion_r']");
+    if (reviewComment?.id) {
+      return {
+        id: `review-comment:${reviewComment.id.replace(/^discussion_r/, "")}`,
+        kind: "comment",
+        label: "Review comment",
+        numbered: true
+      };
+    }
+    const preview = element.closest(".js-preview-body, [data-testid='markdown-preview']");
+    if (preview) {
+      return { id: preview.id ? `preview:${preview.id}` : void 0, kind: "markdown", label: "Preview", numbered: true };
+    }
+    const review = element.closest("[id^='pullrequestreview-']");
+    if (review?.id) {
+      return {
+        id: `review:${review.id.replace(/^pullrequestreview-/, "")}`,
+        kind: "comment",
+        label: "Review",
+        numbered: true
       };
     }
     if (element.closest(ISSUE_BODY_SELECTOR)) {
       return {
         id: "issue-body",
         kind: "markdown",
-        label: "Issue / PR Body",
-        variant: null
+        label: "Issue / PR Body"
       };
     }
     if (element.closest(PR_BODY_SELECTOR)) {
       return {
         id: "pull-request-body",
         kind: "markdown",
-        label: "Issue / PR Body",
-        variant: null
+        label: "Issue / PR Body"
+      };
+    }
+    const discussion = element.closest("[data-testid='discussion-body'], [id^='discussion-']");
+    if (discussion) {
+      return { id: discussion.id || "discussion-body", kind: "markdown", label: "Discussion" };
+    }
+    const release = element.closest(".release-entry, [data-testid='release-card']");
+    if (release) {
+      const tagLink = release.querySelector("a[href*='/releases/tag/']");
+      const tag = tagLink ? new URL(tagLink.href, location.href).pathname.split("/releases/tag/")[1] : null;
+      return {
+        id: tag ? `release:${tag}` : release.id ? `release:${release.id}` : void 0,
+        kind: "markdown",
+        label: "Release",
+        numbered: true
       };
     }
     if (isGitHubWikiPath(location)) {
       return {
         id: "wiki",
         kind: "markdown",
-        label: "Wiki",
-        variant: null
+        label: "Wiki"
       };
     }
     return {
-      id: "document",
       kind: "markdown",
       label: "Document",
-      variant: "document"
+      numbered: true
     };
   }
   var githubAdapter = {
@@ -337,22 +416,23 @@
     },
     findContainers(document2) {
       const candidates = queryContentCandidates(document2, GITHUB_CONTENT_ROOT_SELECTOR);
-      const counts = {
-        comment: 0,
-        document: 0
-      };
+      const counts = /* @__PURE__ */ new Map();
       return buildContentContainers("github", candidates, (element) => {
         const descriptor = describeGitHubContainer(element, document2.location);
-        const sequence = descriptor.variant ? ++counts[descriptor.variant] : 0;
+        const sequence = (counts.get(descriptor.label) ?? 0) + 1;
+        counts.set(descriptor.label, sequence);
         return {
-          id: descriptor.variant === "document" ? `${descriptor.id}:${sequence}` : descriptor.id,
-          label: descriptor.variant ? `${descriptor.label} ${sequence}` : descriptor.label,
+          id: descriptor.id ?? `${descriptor.label.toLowerCase().replace(/\s+/g, "-")}:${sequence}`,
+          label: descriptor.numbered ? `${descriptor.label} ${sequence}` : descriptor.label,
           kind: descriptor.kind
         };
       });
     },
     shouldRefreshForMutation(mutation) {
-      return shouldRefreshForContentMutation(mutation, GITHUB_CONTENT_ROOT_SELECTOR);
+      if (shouldRefreshForContentMutation(mutation, GITHUB_CONTENT_ROOT_SELECTOR)) {
+        return true;
+      }
+      return isDockVisibilityMutation(mutation);
     },
     getStickyHeaderOffset(document2) {
       const sticky = document2.querySelector(STICKY_HEADER_SELECTOR);
@@ -366,19 +446,27 @@
       return {
         host,
         boundary: resolveGitHubDockBoundary(host),
-        topOffset: 47
+        topOffset: this.getStickyHeaderOffset(document2)
       };
     }
   };
   function resolveGitHubDockHost(document2) {
     return queryFirst(document2, GITHUB_DOCK_HOST_SELECTORS);
   }
+  function isDockVisibilityMutation(mutation) {
+    const target = mutation.target instanceof HTMLElement ? mutation.target : null;
+    if (mutation.type !== "attributes" || !target || isManagedNode(target) || target.closest(".ghcm-root, .ghcm-dock-row")) {
+      return false;
+    }
+    const selector = GITHUB_DOCK_HOST_SELECTORS.join(", ");
+    return target.matches(selector) || Boolean(target.querySelector(selector));
+  }
   function resolveGitHubDockBoundary(host) {
     return closestFirst(host, GITHUB_DOCK_BOUNDARY_SELECTORS);
   }
   function queryFirst(document2, selectors) {
     for (const selector of selectors) {
-      const match = document2.querySelector(selector);
+      const match = Array.from(document2.querySelectorAll(selector)).find((element) => isVisibleElement(element) && !isEditableElement(element) && !element.closest(".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']") && !element.closest(GITHUB_CONTENT_ROOT_SELECTOR));
       if (match) {
         return match;
       }
@@ -598,34 +686,28 @@
     all: initial;
     display: block;
     width: 100%;
-    font-family:
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      "Noto Sans",
-      "Helvetica Neue",
-      Arial,
-      sans-serif,
-      "Apple Color Emoji",
-      "Segoe UI Emoji";
-    color: var(--fgColor-default, #1f2328);
-    --ghcm-ink: var(--fgColor-default, #1f2328);
-    --ghcm-ink-soft: var(--fgColor-muted, #59636e);
-    --ghcm-ink-muted: var(--fgColor-muted, #656d76);
-    --ghcm-line: var(--borderColor-default, #d0d7de);
-    --ghcm-line-muted: var(--borderColor-muted, #d8dee4);
-    --ghcm-surface: var(--bgColor-default, #ffffff);
-    --ghcm-surface-subtle: var(--bgColor-muted, #f6f8fa);
-    --ghcm-surface-accent: var(--bgColor-accent-muted, rgba(9, 105, 218, 0.08));
-    --ghcm-shadow: rgba(31, 35, 40, 0.08);
-    --ghcm-shadow-strong: rgba(31, 35, 40, 0.12);
-    --ghcm-accent: var(--fgColor-accent, #0969da);
-    --ghcm-h1: var(--fgColor-default, #24292f);
-    --ghcm-h2: var(--fgColor-default, #24292f);
-    --ghcm-h3: var(--fgColor-default, #24292f);
-    --ghcm-h4: var(--fgColor-muted, #57606a);
-    --ghcm-h5: var(--fgColor-muted, #57606a);
-    --ghcm-h6: var(--fgColor-muted, #57606a);
+    min-width: 0;
+    font: inherit;
+    color: var(--fgColor-default, var(--color-fg-default, inherit));
+    --ghcm-space-1: var(--base-size-4, 4px);
+    --ghcm-space-2: var(--base-size-8, 8px);
+    --ghcm-space-3: var(--base-size-12, 12px);
+    --ghcm-space-4: var(--base-size-16, 16px);
+    --ghcm-ink: var(--fgColor-default, var(--color-fg-default, currentColor));
+    --ghcm-ink-soft: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+    --ghcm-ink-muted: var(--ghcm-ink-soft);
+    --ghcm-line: var(--borderColor-default, var(--color-border-default, #d0d7de));
+    --ghcm-line-muted: var(--borderColor-muted, var(--color-border-muted, #d8dee4));
+    --ghcm-surface: var(--bgColor-default, var(--color-canvas-default, #ffffff));
+    --ghcm-surface-subtle: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
+    --ghcm-surface-accent: var(--bgColor-accent-muted, var(--color-accent-subtle, rgba(9, 105, 218, 0.08)));
+    --ghcm-accent: var(--fgColor-accent, var(--color-accent-fg, #0969da));
+    --ghcm-h1: var(--ghcm-ink);
+    --ghcm-h2: var(--ghcm-ink);
+    --ghcm-h3: var(--ghcm-ink);
+    --ghcm-h4: var(--ghcm-ink-soft);
+    --ghcm-h5: var(--ghcm-ink-soft);
+    --ghcm-h6: var(--ghcm-ink-soft);
   }
 
   .ghcm-root,
@@ -633,6 +715,19 @@
   .ghcm-root *::before,
   .ghcm-root *::after {
     box-sizing: border-box;
+  }
+
+  .ghcm-root button {
+    font-family: inherit;
+  }
+
+  .ghcm-root :is(.ghcm-trigger, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
+    outline: 2px solid var(--ghcm-accent);
+    outline-offset: 2px;
+  }
+
+  .ghcm-root .ghcm-outline-link:focus-visible {
+    outline-offset: -2px;
   }
 
   .ghcm-cell {
@@ -645,34 +740,31 @@
     overflow: visible;
   }
 
-  .ghcm-dock-row {
-    border-top: 0 !important;
-  }
-
-  .ghcm-preceding-dock-row,
-  .ghcm-preceding-dock-row > .BorderGrid-cell,
-  .ghcm-preceding-dock-row > [class*="BorderGrid-cell"] {
-    border-bottom: 0 !important;
-  }
-
-  .ghcm-dock-cell {
-    border: 0 !important;
-    padding: 0 !important;
+  .ghcm-dock-row:not(.BorderGrid-row) {
+    margin-top: var(--base-size-16, 16px);
+    padding-top: var(--base-size-16, 16px);
+    border-top: 1px solid var(--borderColor-muted, var(--color-border-muted, #d8dee4));
   }
 
   .ghcm-root.is-docked {
     position: relative;
-    top: auto;
     z-index: 2;
   }
 
   .ghcm-root.is-inline {
-    margin: 0 0 24px;
+    margin-bottom: var(--ghcm-space-2);
   }
 
-  .ghcm-section-hidden,
-  .ghcm-hidden-by-parent {
-    display: none !important;
+  .markdown-body > .ghcm-root + :is(h1, h2, h3, h4, h5, h6, .markdown-heading) {
+    margin-top: 0 !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ghcm-root *,
+    .ghcm-heading-toggle {
+      transition: none !important;
+      scroll-behavior: auto !important;
+    }
   }
 `;
 
@@ -781,6 +873,11 @@
   .ghcm-heading-block--wrapped .heading-element > .ghcm-heading-toggle:hover {
     transform: translateY(-1px);
   }
+
+  .ghcm-section-hidden,
+  .ghcm-hidden-by-parent {
+    display: none !important;
+  }
 `;
 
   // src/ui/styles/outline.ts
@@ -788,10 +885,12 @@
   .ghcm-outline {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    height: 100%;
+    flex: 1 1 auto;
+    gap: 0;
     min-height: 0;
     overflow: auto;
+    overscroll-behavior: contain;
+    margin: 0;
     padding: 0;
     scrollbar-width: thin;
     scrollbar-color: rgba(101, 109, 118, 0.36) transparent;
@@ -816,11 +915,11 @@
   }
 
   .ghcm-outline-group + .ghcm-outline-group {
-    margin-top: 12px;
+    margin-top: var(--ghcm-space-2);
   }
 
-  .ghcm-outline-group-title {
-    margin: 0 0 6px;
+  .ghcm-root .ghcm-outline-group-title {
+    margin: 0 0 var(--ghcm-space-1);
     font-size: 11px;
     font-weight: 600;
     line-height: 16px;
@@ -831,14 +930,17 @@
     --ghcm-level-accent: var(--ghcm-h4);
     appearance: none;
     display: grid;
+    flex-shrink: 0;
     grid-template-columns: 2px minmax(0, 1fr);
     align-items: start;
-    gap: 8px;
+    gap: var(--ghcm-space-2);
     width: 100%;
     border: none;
     background: transparent;
-    border-radius: 6px;
-    padding: 5px 8px 5px calc(8px + (var(--ghcm-depth, 0) * 12px));
+    border-radius: 4px;
+    margin: 0;
+    padding: var(--ghcm-space-1) var(--ghcm-space-1) var(--ghcm-space-1)
+      calc(var(--ghcm-space-1) + (var(--ghcm-depth, 0) * var(--ghcm-space-3)));
     cursor: pointer;
     text-align: left;
     transition: background-color 120ms ease, opacity 120ms ease;
@@ -911,84 +1013,66 @@
     font-weight: 600;
   }
 
-  .ghcm-outline-empty {
+  .ghcm-root .ghcm-outline-empty {
     margin: 0;
-    padding: 8px 0;
+    padding: var(--ghcm-space-2) 0;
     color: var(--ghcm-ink-muted);
     font-size: 12px;
     line-height: 1.5;
   }
 
-  .ghcm-root.is-overlay .ghcm-outline-link {
-    border-radius: 8px;
-    padding: 7px 10px 7px calc(10px + (var(--ghcm-depth, 0) * 14px));
-  }
-
-  .ghcm-root.is-overlay .ghcm-outline-label {
-    font-size: 13px;
-  }
-
-  .ghcm-root.is-docked .ghcm-outline {
-    gap: 1px;
-  }
-
-  .ghcm-root.is-docked .ghcm-outline-link {
-    border-radius: 0;
-    padding: 4px 0 4px calc(var(--ghcm-depth, 0) * 12px);
-  }
-
-  .ghcm-root.is-docked .ghcm-outline-group-title {
-    margin-bottom: 4px;
+  .ghcm-root.is-inline .ghcm-outline {
+    max-height: min(45dvh, 420px);
   }
 `;
 
   // src/ui/styles/panel.ts
   var panelStyles = `
-  .ghcm-trigger,
-  .ghcm-panel,
-  .ghcm-backdrop {
-    font-family: inherit;
-  }
-
   .ghcm-trigger {
     appearance: none;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    border: 1px solid var(--ghcm-line);
-    background: var(--ghcm-surface);
+    gap: var(--ghcm-space-1);
+    margin: 0;
+    border: 0;
+    border-radius: 4px;
+    padding: var(--ghcm-space-1) 0;
+    background: transparent;
     color: var(--ghcm-ink-soft);
-    border-radius: 6px;
-    box-shadow: 0 1px 0 rgba(31, 35, 40, 0.04);
-    padding: 5px 12px;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 14px;
+    font-weight: 600;
     line-height: 20px;
     cursor: pointer;
-    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    transition: color 120ms ease;
+  }
+
+  .ghcm-trigger::before {
+    content: "▸";
+    font-size: 12px;
   }
 
   .ghcm-trigger:hover {
-    background: var(--ghcm-surface-subtle);
-    color: var(--ghcm-ink);
+    color: var(--ghcm-accent);
   }
 
-  .ghcm-trigger.is-hidden {
-    display: none;
-  }
-
-  .ghcm-backdrop {
-    appearance: none;
-    border: 0;
-    padding: 0;
+  .ghcm-trigger.is-hidden,
+  .ghcm-inline-action.is-hidden {
     display: none;
   }
 
   .ghcm-panel {
     display: none;
     flex-direction: column;
+    position: static;
+    inset: auto;
+    width: 100%;
     min-height: 0;
+    margin: 0;
+    border: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+    box-shadow: none;
   }
 
   .ghcm-panel.is-open {
@@ -997,68 +1081,32 @@
 
   .ghcm-root.is-overlay .ghcm-trigger {
     position: fixed;
-    top: calc(80px + env(safe-area-inset-top, 0px));
-    right: 16px;
+    top: 88px;
+    right: var(--ghcm-space-4);
     z-index: 2147483644;
-  }
-
-  .ghcm-root.is-overlay .ghcm-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 2147483643;
-    display: block;
-    background: rgba(27, 31, 36, 0.38);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 160ms ease;
-  }
-
-  .ghcm-root.is-overlay .ghcm-backdrop.is-open {
-    opacity: 1;
-    pointer-events: auto;
+    border: 1px solid var(--ghcm-line);
+    padding: var(--ghcm-space-1) var(--ghcm-space-2);
+    background: var(--ghcm-surface);
   }
 
   .ghcm-root.is-overlay .ghcm-panel {
     position: fixed;
-    top: calc(72px + env(safe-area-inset-top, 0px));
-    right: 16px;
-    bottom: 16px;
-    width: min(320px, calc(100vw - 32px));
+    top: var(--ghcm-overlay-top, 88px);
+    left: var(--ghcm-overlay-left, max(16px, calc(100vw - 336px)));
+    right: auto;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    max-height: min(560px, calc(100dvh - 16px));
     z-index: 2147483644;
-    background: var(--ghcm-surface);
     border: 1px solid var(--ghcm-line);
-    border-radius: 12px;
-    box-shadow:
-      0 8px 24px var(--ghcm-shadow-strong),
-      0 1px 0 rgba(31, 35, 40, 0.04);
-    overflow: hidden;
-    opacity: 0;
-    transform: translateY(-4px);
-    pointer-events: none;
-    transition: opacity 160ms ease, transform 160ms ease;
-  }
-
-  .ghcm-root.is-overlay .ghcm-panel.is-open {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
+    border-radius: 6px;
+    background: var(--ghcm-surface);
+    box-shadow: var(--shadow-floating-small, 0 4px 12px rgba(31, 35, 40, 0.12));
   }
 
   .ghcm-root.is-docked .ghcm-panel {
-    position: static;
-    top: auto;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    width: 100%;
-    z-index: 2;
-    border: none;
-    background: var(--ghcm-surface);
-    box-shadow: none;
-    overflow: hidden;
     height: var(--ghcm-panel-height, auto);
     max-height: var(--ghcm-panel-max-height, none);
-    will-change: auto;
   }
 
   .ghcm-root.is-docked.is-floating .ghcm-panel {
@@ -1066,76 +1114,73 @@
     top: var(--ghcm-panel-top, 0px);
     left: var(--ghcm-panel-left, 0px);
     width: var(--ghcm-panel-width, 100%);
-  }
-
-  .ghcm-root.is-inline .ghcm-panel {
-    position: static;
-    width: 100%;
-    max-width: 100%;
-    border: 1px solid var(--ghcm-line);
-    border-radius: 6px;
     background: var(--ghcm-surface);
-    box-shadow: 0 1px 0 rgba(31, 35, 40, 0.04);
-    overflow: hidden;
   }
 
   .ghcm-sidebar-shell {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     min-height: 0;
-    height: 100%;
-    background: var(--ghcm-surface);
-  }
-
-  .ghcm-root.is-docked .ghcm-sidebar-shell {
-    height: 100%;
-    max-height: inherit;
-    background: var(--ghcm-surface);
-    border-top: 1px solid var(--ghcm-line);
   }
 
   .ghcm-sidebar-header {
     display: flex;
-    align-items: flex-start;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 16px;
-    border-bottom: 1px solid var(--ghcm-line);
+    gap: var(--ghcm-space-1) var(--ghcm-space-2);
+    margin: 0;
+    border: 0;
+    padding: 0 0 var(--ghcm-space-2);
   }
 
-  .ghcm-root.is-docked .ghcm-sidebar-header {
-    display: block;
-    padding: 16px 0;
+  .ghcm-root.is-overlay .ghcm-sidebar-header {
+    border-bottom: 1px solid var(--ghcm-line);
+    padding: var(--ghcm-space-2);
   }
 
   .ghcm-sidebar-kicker {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
     margin: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--ghcm-ink);
+    font: inherit;
     font-size: 14px;
     font-weight: 600;
     line-height: 20px;
-    color: var(--ghcm-ink);
+  }
+
+  .ghcm-root.is-overlay .ghcm-drag-handle {
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+  }
+
+  .ghcm-root .ghcm-panel.is-dragging .ghcm-drag-handle {
+    cursor: grabbing;
   }
 
   .ghcm-sidebar-tools {
     display: flex;
     align-items: center;
-    gap: 8px;
     flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .ghcm-root.is-docked .ghcm-sidebar-tools {
-    margin-top: 4px;
-    gap: 10px;
-    justify-content: flex-start;
+    gap: var(--ghcm-space-2);
   }
 
   .ghcm-inline-action {
     appearance: none;
-    border: none;
+    margin: 0;
+    border: 0;
+    border-radius: 4px;
+    padding: 0;
     background: transparent;
     color: var(--ghcm-accent);
-    padding: 0;
     font-size: 12px;
     font-weight: 500;
     line-height: 20px;
@@ -1148,56 +1193,43 @@
     text-decoration: underline;
   }
 
-  .ghcm-inline-action.is-hidden {
-    display: none;
-  }
-
   .ghcm-sidebar-outline {
+    display: flex;
     flex: 1 1 auto;
     min-height: 0;
-    padding: 12px;
+    margin: 0;
+    padding: 0;
   }
 
-  .ghcm-root.is-docked .ghcm-sidebar-outline {
-    overflow: hidden;
-    padding: 16px 0 0;
-  }
-
-  .ghcm-root.is-inline .ghcm-sidebar-outline {
-    max-height: min(45vh, 420px);
+  .ghcm-root.is-overlay .ghcm-sidebar-outline {
+    padding: var(--ghcm-space-2);
   }
 `;
 
   // src/ui/styles/responsive.ts
   var responsiveStyles = `
-  @media (max-width: 1179px) {
-    .ghcm-root.is-overlay .ghcm-trigger {
-      top: calc(76px + env(safe-area-inset-top, 0px));
-      right: 14px;
+  @media (max-width: 1179px), (pointer: coarse) {
+    .ghcm-root .ghcm-trigger,
+    .ghcm-root .ghcm-inline-action,
+    .ghcm-root .ghcm-outline-link,
+    .ghcm-root.is-overlay .ghcm-drag-handle {
+      min-width: 44px;
+      min-height: 44px;
     }
 
-    .ghcm-root.is-overlay .ghcm-panel {
-      right: 14px;
-      top: calc(70px + env(safe-area-inset-top, 0px));
-      bottom: 14px;
-      width: min(320px, calc(100vw - 28px));
+    .ghcm-root .ghcm-inline-action {
+      padding: var(--ghcm-space-1) var(--ghcm-space-2);
+    }
+
+    .ghcm-root .ghcm-outline-link {
+      align-items: center;
     }
   }
 
   @media (max-width: 599px) {
-    .ghcm-root.is-overlay .ghcm-panel {
-      width: calc(100vw - 20px);
-      right: 10px;
-      top: calc(66px + env(safe-area-inset-top, 0px));
-      bottom: 10px;
-    }
-
     .ghcm-sidebar-header {
-      padding: 16px 16px 12px;
-    }
-
-    .ghcm-sidebar-outline {
-      padding: 8px 12px 12px;
+      align-items: flex-start;
+      flex-direction: column;
     }
   }
 `;
@@ -1235,7 +1267,13 @@
           }
         }
       });
-      this.observer.observe(document.documentElement, { childList: true, subtree: true });
+      this.observer.observe(document.documentElement, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["hidden", "aria-hidden", "open", "style", "class"]
+      });
     }
     destroy() {
       this.observer?.disconnect();
@@ -1295,7 +1333,7 @@
       return this.setActiveHeadingKey(this.computeActiveHeadingKey(), force);
     }
     refreshHeadingPositions(snapshots) {
-      const nextSignature = snapshots.map((heading) => `${heading.key}:${heading.hiddenByAncestor ? "hidden" : "visible"}`).join("|");
+      const nextSignature = snapshots.map((heading) => `${heading.key}:${heading.collapsed}:${heading.hiddenByAncestor}:${heading.text}`).join("|");
       if (!this.positionsDirty && nextSignature === this.positionsSignature) {
         return;
       }
@@ -1339,14 +1377,21 @@
   };
 
   // src/ui/heading-controls.ts
-  function createToggleButton(heading, collapsed) {
+  function createToggleButton(text, collapsed) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ghcm-heading-toggle";
-    button.textContent = collapsed ? "▸" : "▾";
-    button.setAttribute("aria-label", `Toggle section: ${heading.text}`);
-    button.setAttribute("title", heading.text);
+    syncToggleButton(button, text, collapsed);
     return button;
+  }
+  function syncToggleButton(button, text, collapsed) {
+    const symbol = collapsed ? "▸" : "▾";
+    if (button.textContent !== symbol) {
+      button.textContent = symbol;
+    }
+    button.title = text;
+    button.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} section: ${text}`);
+    button.setAttribute("aria-expanded", String(!collapsed));
   }
   var HeadingControls = class {
     constructor(document2, engine) {
@@ -1355,56 +1400,15 @@
       __publicField(this, "toggleElements", /* @__PURE__ */ new Map());
     }
     mount(signal) {
-      this.document.headings.forEach((heading) => {
-        const binding = this.document.getBinding(heading.key);
-        if (!binding) {
-          return;
-        }
-        const wrapped = binding.blockEl !== binding.headingEl;
-        const toggleHeading = (useSiblings) => {
-          if (useSiblings) {
-            this.engine.toggleWithSiblings(heading.key);
-          } else {
-            this.engine.toggle(heading.key);
-          }
-        };
-        binding.blockEl.classList.add("ghcm-heading-block");
-        if (wrapped) {
-          binding.blockEl.classList.add("ghcm-heading-block--wrapped");
-        } else {
-          binding.headingEl.classList.add("ghcm-heading-inline");
-        }
-        const button = createToggleButton(heading, this.engine.isCollapsed(heading.key));
-        this.toggleElements.set(heading.key, button);
-        binding.headingEl.prepend(button);
-        button.addEventListener(
-          "click",
-          (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            toggleHeading(event.shiftKey);
-          },
-          { signal }
-        );
-        const clickTarget = wrapped ? binding.blockEl : binding.headingEl;
-        clickTarget.addEventListener(
-          "click",
-          (event) => {
-            if (getSelectionText() || isNativePermalinkTarget(binding, event.target) || isInteractiveTarget(event.target)) {
-              return;
-            }
-            event.preventDefault();
-            toggleHeading(event.shiftKey);
-          },
-          { signal }
-        );
-      });
+      for (const heading of this.document.headings) {
+        this.mountHeading(heading, signal);
+      }
     }
     sync(snapshots) {
-      snapshots.forEach((snapshot) => {
+      for (const snapshot of snapshots) {
         const binding = this.document.getBinding(snapshot.key);
         if (!binding) {
-          return;
+          continue;
         }
         binding.blockEl.classList.toggle("ghcm-hidden-by-parent", snapshot.hiddenByAncestor);
         binding.blockEl.classList.toggle("ghcm-collapsed", snapshot.collapsed);
@@ -1412,17 +1416,12 @@
         binding.blockEl.setAttribute("aria-expanded", String(!snapshot.collapsed));
         const toggle = this.toggleElements.get(snapshot.key);
         if (toggle) {
-          toggle.textContent = snapshot.collapsed ? "▸" : "▾";
-          toggle.setAttribute("title", snapshot.text);
-          toggle.setAttribute(
-            "aria-label",
-            `${snapshot.collapsed ? "Expand" : "Collapse"} section: ${snapshot.text}`
-          );
+          syncToggleButton(toggle, snapshot.text, snapshot.collapsed);
         }
         for (const element of binding.sectionEls) {
           element.classList.toggle("ghcm-section-hidden", snapshot.hiddenByAncestor || snapshot.collapsed);
         }
-      });
+      }
     }
     isConnected() {
       return this.document.headings.every((heading) => {
@@ -1434,19 +1433,63 @@
       });
     }
     destroy() {
-      this.document.headings.forEach((heading) => {
+      for (const toggle of this.toggleElements.values()) {
+        toggle.remove();
+      }
+      this.toggleElements.clear();
+      for (const heading of this.document.headings) {
         const binding = this.document.getBinding(heading.key);
         if (!binding) {
-          return;
+          continue;
         }
-        this.toggleElements.get(heading.key)?.remove();
-        this.toggleElements.delete(heading.key);
         binding.blockEl.classList.remove("ghcm-heading-block", "ghcm-heading-block--wrapped");
         binding.blockEl.classList.remove("ghcm-hidden-by-parent", "ghcm-collapsed", "ghcm-visible-heading");
         binding.blockEl.removeAttribute("aria-expanded");
         binding.headingEl.classList.remove("ghcm-heading-inline");
         binding.sectionEls.forEach((element) => element.classList.remove("ghcm-section-hidden"));
-      });
+      }
+    }
+    mountHeading(heading, signal) {
+      const binding = this.document.getBinding(heading.key);
+      if (!binding) {
+        return;
+      }
+      const wrapped = binding.blockEl !== binding.headingEl;
+      binding.blockEl.classList.add("ghcm-heading-block");
+      if (wrapped) {
+        binding.blockEl.classList.add("ghcm-heading-block--wrapped");
+      } else {
+        binding.headingEl.classList.add("ghcm-heading-inline");
+      }
+      const button = createToggleButton(heading.text, this.engine.isCollapsed(heading.key));
+      this.toggleElements.set(heading.key, button);
+      binding.headingEl.prepend(button);
+      button.addEventListener(
+        "click",
+        (event) => {
+          event.stopPropagation();
+          this.toggleHeading(heading.key, event);
+        },
+        { signal }
+      );
+      binding.blockEl.addEventListener(
+        "click",
+        (event) => {
+          if (getSelectionText() || isNativePermalinkTarget(binding, event.target) || isInteractiveTarget(event.target)) {
+            return;
+          }
+          this.toggleHeading(heading.key, event);
+        },
+        { signal }
+      );
+    }
+    toggleHeading(key, event) {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.engine.toggleWithSiblings(key);
+      } else {
+        this.engine.toggle(key);
+      }
     }
   };
   function isNativePermalinkTarget(binding, target) {
@@ -1463,13 +1506,18 @@
   function measureDockedPanel(elements, context) {
     const rowRect = elements.dockRow.getBoundingClientRect();
     const cellRect = elements.dockCell.getBoundingClientRect();
+    const cellStyle = window.getComputedStyle(elements.dockCell);
+    const inset = (property) => Number.parseFloat(cellStyle.getPropertyValue(property)) || 0;
+    const leftInset = inset("padding-left") + inset("border-left-width");
+    const rightInset = inset("padding-right") + inset("border-right-width");
+    const topInset = inset("padding-top") + inset("border-top-width");
     const dockedBoundaryRect = context.boundary?.getBoundingClientRect();
     return {
       boundaryViewportBottom: dockedBoundaryRect ? dockedBoundaryRect.bottom - DOCKED_PANEL_BOUNDARY_BOTTOM_GAP : Number.POSITIVE_INFINITY,
-      cellLeft: Math.max(cellRect.left, 0),
-      cellWidth: Math.max(cellRect.width, 0),
+      cellLeft: Math.max(cellRect.left + leftInset, 0),
+      cellWidth: Math.max(cellRect.width - leftInset - rightInset, 0),
       naturalPanelHeight: Math.max(elements.panel.scrollHeight, elements.panel.offsetHeight, 0),
-      rowViewportTop: rowRect.top
+      rowViewportTop: rowRect.top + topInset
     };
   }
   function computeDockedPanelFrame(measurement, topOffset, viewportHeight) {
@@ -1539,25 +1587,27 @@
   }
 
   // src/ui/panel-placement.ts
+  var UNSAFE_PANEL_CONTEXT_SELECTOR = ".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']";
+  var INVALID_PANEL_HOST_TAGS = /* @__PURE__ */ new Set(["P", "SPAN", "PRE", "CODE", "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "UL", "OL", "DL"]);
   function resolvePanelPlacement(desktop, resolvers) {
-    if (!desktop) {
-      return { kind: "overlay" };
-    }
-    const dockedLayout = resolvers.resolveDockedLayout?.() ?? null;
-    if (dockedLayout) {
+    const dockedLayout = desktop ? resolvers.resolveDockedLayout?.() ?? null : null;
+    if (dockedLayout && isUsablePanelHost(dockedLayout.host)) {
       return {
         kind: "docked",
         context: dockedLayout
       };
     }
     const inlineHost = resolvers.resolveInlineHost?.() ?? null;
-    if (inlineHost) {
+    if (inlineHost && isUsablePanelHost(inlineHost)) {
       return {
         kind: "inline",
         host: inlineHost
       };
     }
     return { kind: "overlay" };
+  }
+  function isUsablePanelHost(element) {
+    return !INVALID_PANEL_HOST_TAGS.has(element.tagName) && !element.closest(UNSAFE_PANEL_CONTEXT_SELECTOR) && !isEditableElement(element) && isVisibleElement(element);
   }
   function collectPlacementTargets(placement) {
     if (placement.kind !== "docked") {
@@ -1570,7 +1620,7 @@
   }
 
   // src/ui/panel-layout.ts
-  var DockedPanelLayout = class {
+  var PanelLayout = class {
     constructor(elements, resolvers) {
       this.elements = elements;
       this.resolvers = resolvers;
@@ -1581,7 +1631,6 @@
       __publicField(this, "resizeObserver", null);
       __publicField(this, "layoutMutationObserver", null);
       __publicField(this, "observedDockElements", []);
-      __publicField(this, "styledPrecedingDockRow", null);
       __publicField(this, "measurementDirty", true);
     }
     bind(signal) {
@@ -1613,7 +1662,6 @@
       this.placement = resolvePanelPlacement(this.desktop, this.resolvers);
       this.mountPlacement(this.placement);
       this.syncLayoutObservers(this.placement);
-      this.syncPrecedingDockRow(this.placement);
       this.elements.root.style.setProperty(
         "--ghcm-sticky-top",
         `${this.placement.kind === "docked" ? this.placement.context.topOffset : 0}px`
@@ -1626,6 +1674,9 @@
         return;
       }
       if (placement.kind === "docked") {
+        const nativeGrid = placement.context.host.classList.contains("BorderGrid");
+        this.elements.dockRow.classList.toggle("BorderGrid-row", nativeGrid);
+        this.elements.dockCell.classList.toggle("BorderGrid-cell", nativeGrid);
         if (this.elements.root.parentElement !== this.elements.dockCell) {
           this.elements.dockCell.append(this.elements.root);
         }
@@ -1671,7 +1722,6 @@
       }
       if (placement.kind === "docked") {
         this.layoutMutationObserver = new MutationObserver(() => {
-          this.syncPrecedingDockRow(this.placement);
           this.invalidateGeometry();
         });
         this.layoutMutationObserver.observe(placement.context.host, {
@@ -1684,7 +1734,6 @@
       this.resizeObserver = null;
       this.layoutMutationObserver?.disconnect();
       this.layoutMutationObserver = null;
-      this.clearPrecedingDockRow();
       this.observedDockElements = [];
     }
     invalidateGeometry() {
@@ -1697,22 +1746,6 @@
     }
     shouldPositionDockedPanel() {
       return this.desktop && this.placement.kind === "docked" && this.open;
-    }
-    syncPrecedingDockRow(placement) {
-      this.clearPrecedingDockRow();
-      if (placement.kind !== "docked") {
-        return;
-      }
-      const previousRow = this.elements.dockRow.previousElementSibling;
-      if (!(previousRow instanceof HTMLElement)) {
-        return;
-      }
-      previousRow.classList.add("ghcm-preceding-dock-row");
-      this.styledPrecedingDockRow = previousRow;
-    }
-    clearPrecedingDockRow() {
-      this.styledPrecedingDockRow?.classList.remove("ghcm-preceding-dock-row");
-      this.styledPrecedingDockRow = null;
     }
     updateDockedPosition() {
       if (!this.shouldPositionDockedPanel()) {
@@ -1733,6 +1766,242 @@
     }
   };
 
+  // src/ui/panel-dom.ts
+  function createPanelDom() {
+    const dockRow = document.createElement("div");
+    dockRow.className = "ghcm-dock-row BorderGrid-row";
+    const dockCell = document.createElement("div");
+    dockCell.className = "ghcm-dock-cell BorderGrid-cell";
+    const root = document.createElement("div");
+    root.className = "ghcm-root";
+    const cell = document.createElement("div");
+    cell.className = "ghcm-cell";
+    const trigger = createButton("ghcm-trigger", "Contents", "Toggle contents");
+    trigger.setAttribute("aria-controls", "ghcm-contents-panel");
+    const panel = document.createElement("aside");
+    panel.id = "ghcm-contents-panel";
+    panel.className = "ghcm-panel";
+    panel.tabIndex = -1;
+    panel.setAttribute("aria-label", "Page contents");
+    const collapseAllButton = createButton("ghcm-inline-action", "Collapse all");
+    collapseAllButton.dataset.action = "collapse-all";
+    const expandAllButton = createButton("ghcm-inline-action", "Expand all");
+    expandAllButton.dataset.action = "expand-all";
+    const closeButton = createButton("ghcm-inline-action ghcm-close-action", "Hide");
+    const outline = document.createElement("nav");
+    outline.className = "ghcm-outline";
+    outline.setAttribute("aria-label", "Page contents");
+    const shell = document.createElement("div");
+    shell.className = "ghcm-sidebar-shell";
+    const header = document.createElement("header");
+    header.className = "ghcm-sidebar-header";
+    const kicker = document.createElement("div");
+    kicker.className = "ghcm-sidebar-kicker ghcm-drag-handle";
+    kicker.textContent = "Contents";
+    const toolbar = document.createElement("div");
+    toolbar.className = "ghcm-sidebar-tools";
+    toolbar.append(collapseAllButton, expandAllButton, closeButton);
+    header.append(kicker, toolbar);
+    const outlineShell = document.createElement("div");
+    outlineShell.className = "ghcm-sidebar-outline";
+    outlineShell.append(outline);
+    shell.append(header, outlineShell);
+    panel.append(shell);
+    cell.append(trigger, panel);
+    root.append(cell);
+    dockCell.append(root);
+    dockRow.append(dockCell);
+    return { dockRow, dockCell, root, trigger, dragHandle: kicker, panel, outline, collapseAllButton, expandAllButton, closeButton };
+  }
+  function createButton(className, textContent, ariaLabel) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = textContent;
+    if (ariaLabel) {
+      button.setAttribute("aria-label", ariaLabel);
+    }
+    return button;
+  }
+
+  // src/ui/panel-focus.ts
+  var PanelFocus = class {
+    constructor(dom) {
+      this.dom = dom;
+      __publicField(this, "open", false);
+      __publicField(this, "returnTarget", null);
+    }
+    sync({ open, moveFocus, previousFocus }) {
+      const wasOpen = this.open;
+      this.open = open;
+      if (open && !wasOpen) {
+        this.returnTarget = previousFocus instanceof HTMLElement ? previousFocus : null;
+        if (moveFocus) {
+          (this.dom.panel.querySelector("button:not(:disabled)") ?? this.dom.panel).focus({ preventScroll: true });
+        }
+        return;
+      }
+      if (!open && wasOpen) {
+        if (moveFocus || previousFocus && this.dom.panel.contains(previousFocus)) {
+          this.restoreFocus();
+        }
+        this.returnTarget = null;
+        return;
+      }
+      if (open && previousFocus instanceof HTMLElement && this.dom.panel.contains(previousFocus)) {
+        previousFocus.focus({ preventScroll: true });
+      }
+    }
+    destroy() {
+      if (this.dom.panel.contains(document.activeElement) && this.returnTarget?.isConnected && !this.dom.root.contains(this.returnTarget)) {
+        this.returnTarget.focus({ preventScroll: true });
+      }
+      this.returnTarget = null;
+    }
+    restoreFocus() {
+      const target = this.returnTarget;
+      if (target?.isConnected && target !== document.body && !target.closest("[hidden], [inert]")) {
+        target.focus({ preventScroll: true });
+      }
+      if (!target || document.activeElement !== target) {
+        this.dom.trigger.focus({ preventScroll: true });
+      }
+    }
+  };
+
+  // src/ui/panel-drag.ts
+  var VIEWPORT_MARGIN = 8;
+  var KEYBOARD_STEP = 16;
+  var INTERACTIVE_SELECTOR = "a, button, input, select, textarea, [contenteditable], [role='button']";
+  var PanelDrag = class {
+    constructor(elements) {
+      this.elements = elements;
+      __publicField(this, "abortController", new AbortController());
+      __publicField(this, "bound", false);
+      __publicField(this, "enabled", false);
+      __publicField(this, "position", null);
+      __publicField(this, "drag", null);
+    }
+    bind(signal) {
+      if (this.bound || this.abortController.signal.aborted) {
+        return;
+      }
+      if (signal.aborted) {
+        this.destroy();
+        return;
+      }
+      this.bound = true;
+      const options = { signal: this.abortController.signal };
+      this.elements.handle.addEventListener("pointerdown", (event) => this.startDrag(event), options);
+      this.elements.handle.addEventListener("lostpointercapture", (event) => this.endDrag(event), options);
+      this.elements.handle.addEventListener("keydown", (event) => this.handleKeydown(event), options);
+      document.addEventListener("pointermove", (event) => this.moveDrag(event), { ...options, passive: false });
+      document.addEventListener("pointerup", (event) => this.endDrag(event), options);
+      document.addEventListener("pointercancel", (event) => this.endDrag(event), options);
+      window.addEventListener("resize", () => {
+        if (this.enabled && this.position) {
+          this.moveTo(this.position);
+        }
+      }, options);
+      signal.addEventListener("abort", () => this.destroy(), { ...options, once: true });
+    }
+    sync(enabled) {
+      if (this.abortController.signal.aborted) {
+        return;
+      }
+      this.enabled = enabled;
+      if (enabled) {
+        this.moveTo(this.position ?? this.measurePosition());
+      } else {
+        this.finishDrag();
+      }
+    }
+    destroy() {
+      this.enabled = false;
+      this.finishDrag();
+      this.abortController.abort();
+      this.elements.panel.style.removeProperty("--ghcm-overlay-left");
+      this.elements.panel.style.removeProperty("--ghcm-overlay-top");
+    }
+    startDrag(event) {
+      if (!this.enabled || this.drag || event.button !== 0 || !event.isPrimary) {
+        return;
+      }
+      if (event.target instanceof Element && event.target.closest(INTERACTIVE_SELECTOR)) {
+        return;
+      }
+      event.preventDefault();
+      this.drag = {
+        pointerId: event.pointerId,
+        pointerX: event.clientX,
+        pointerY: event.clientY,
+        position: this.position ?? this.measurePosition()
+      };
+      this.elements.panel.classList.add("is-dragging");
+      try {
+        this.elements.handle.setPointerCapture(event.pointerId);
+      } catch {
+      }
+    }
+    moveDrag(event) {
+      if (!this.drag || event.pointerId !== this.drag.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      this.moveTo({
+        left: this.drag.position.left + event.clientX - this.drag.pointerX,
+        top: this.drag.position.top + event.clientY - this.drag.pointerY
+      });
+    }
+    endDrag(event) {
+      if (event.pointerId === this.drag?.pointerId) {
+        this.finishDrag();
+      }
+    }
+    finishDrag() {
+      const pointerId = this.drag?.pointerId;
+      this.drag = null;
+      this.elements.panel.classList.remove("is-dragging");
+      if (pointerId !== void 0 && this.elements.handle.hasPointerCapture?.(pointerId)) {
+        this.elements.handle.releasePointerCapture(pointerId);
+      }
+    }
+    handleKeydown(event) {
+      if (!this.enabled || event.target !== this.elements.handle || event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+      const step = KEYBOARD_STEP * (event.shiftKey ? 3 : 1);
+      const offsets = {
+        ArrowLeft: { left: -step, top: 0 },
+        ArrowRight: { left: step, top: 0 },
+        ArrowUp: { left: 0, top: -step },
+        ArrowDown: { left: 0, top: step }
+      };
+      const offset = offsets[event.key];
+      if (!offset) {
+        return;
+      }
+      event.preventDefault();
+      const position = this.position ?? this.measurePosition();
+      this.moveTo({ left: position.left + offset.left, top: position.top + offset.top });
+    }
+    measurePosition() {
+      const rect = this.elements.panel.getBoundingClientRect();
+      return { left: rect.left, top: rect.top };
+    }
+    moveTo(position) {
+      const rect = this.elements.panel.getBoundingClientRect();
+      const maxLeft = Math.max(VIEWPORT_MARGIN, window.innerWidth - rect.width - VIEWPORT_MARGIN);
+      const maxTop = Math.max(VIEWPORT_MARGIN, window.innerHeight - rect.height - VIEWPORT_MARGIN);
+      this.position = {
+        left: Math.max(VIEWPORT_MARGIN, Math.min(position.left, maxLeft)),
+        top: Math.max(VIEWPORT_MARGIN, Math.min(position.top, maxTop))
+      };
+      this.elements.panel.style.setProperty("--ghcm-overlay-left", `${this.position.left}px`);
+      this.elements.panel.style.setProperty("--ghcm-overlay-top", `${this.position.top}px`);
+    }
+  };
+
   // src/ui/panel-outline.ts
   var PanelOutlineView = class {
     constructor(outline) {
@@ -1741,6 +2010,7 @@
       __publicField(this, "displayRevision", "");
       __publicField(this, "activeHeadingKey", null);
       __publicField(this, "itemElements", /* @__PURE__ */ new Map());
+      this.outline.tabIndex = -1;
     }
     destroy() {
       window.cancelAnimationFrame(this.visibilityRaf);
@@ -1785,26 +2055,34 @@
       if (typeof this.outline.scrollTo === "function") {
         this.outline.scrollTo({
           top: targetTop,
-          behavior: "smooth"
+          behavior: getPreferredScrollBehavior()
         });
         return;
       }
       this.outline.scrollTop = targetTop;
     }
     renderStructure(headings) {
+      const focused = document.activeElement;
+      const focusedKey = focused instanceof HTMLElement && this.outline.contains(focused) ? focused.closest(".ghcm-outline-link")?.dataset.key : void 0;
       this.itemElements.clear();
-      this.outline.replaceChildren();
       this.activeHeadingKey = null;
+      this.outline.replaceChildren(this.createOutlineContent(headings));
+      if (focusedKey) {
+        const next = this.itemElements.get(focusedKey) ?? this.itemElements.values().next().value ?? this.outline;
+        next.focus({ preventScroll: true });
+      }
+    }
+    createOutlineContent(headings) {
+      const fragment = document.createDocumentFragment();
       if (headings.length === 0) {
         const empty = document.createElement("p");
         empty.className = "ghcm-outline-empty";
         empty.textContent = "No headings found.";
-        this.outline.append(empty);
-        return;
+        fragment.append(empty);
+        return fragment;
       }
       const minLevel = headings.reduce((lowest, heading) => Math.min(lowest, heading.level), headings[0]?.level ?? 1);
       const showGroups = new Set(headings.map((heading) => heading.container.key)).size > 1;
-      const fragment = document.createDocumentFragment();
       let currentGroupKey = "";
       let currentGroup = null;
       headings.forEach((heading) => {
@@ -1826,7 +2104,7 @@
           fragment.append(item);
         }
       });
-      this.outline.append(fragment);
+      return fragment;
     }
     syncItemStates(headings) {
       headings.forEach((heading) => {
@@ -1879,12 +2157,14 @@
       this.options = options;
       __publicField(this, "abortController", new AbortController());
       __publicField(this, "dom", createPanelDom());
+      __publicField(this, "focus", new PanelFocus(this.dom));
+      __publicField(this, "drag", new PanelDrag({ panel: this.dom.panel, handle: this.dom.dragHandle }));
       __publicField(this, "layout");
       __publicField(this, "outlineView");
       __publicField(this, "mounted", false);
       __publicField(this, "desktop", false);
       __publicField(this, "open", false);
-      this.layout = new DockedPanelLayout(
+      this.layout = new PanelLayout(
         {
           dockRow: this.dom.dockRow,
           dockCell: this.dom.dockCell,
@@ -1905,11 +2185,14 @@
       this.mounted = true;
       document.body.append(this.dom.root);
       this.layout.bind(this.abortController.signal);
+      this.drag.bind(this.abortController.signal);
       this.bindEvents();
       this.handleViewportChange(true);
     }
     destroy() {
       this.abortController.abort();
+      this.focus.destroy();
+      this.drag.destroy();
       this.layout.destroy();
       this.outlineView.destroy();
       this.dom.root.remove();
@@ -1920,6 +2203,9 @@
     }
     isConnected() {
       return this.dom.root.isConnected;
+    }
+    refreshLayout() {
+      this.sync();
     }
     setOpen(open) {
       this.applyOpenState(open);
@@ -1934,67 +2220,60 @@
       }
     }
     bindEvents() {
-      this.dom.trigger.addEventListener("click", () => this.setOpen(!this.open), {
-        signal: this.abortController.signal
-      });
-      this.dom.backdrop.addEventListener("click", () => this.setOpen(false), {
-        signal: this.abortController.signal
-      });
-      this.dom.collapseAllButton.addEventListener("click", () => this.options.onCollapseAll(), {
-        signal: this.abortController.signal
-      });
-      this.dom.expandAllButton.addEventListener("click", () => this.options.onExpandAll(), {
-        signal: this.abortController.signal
-      });
-      this.dom.closeButton.addEventListener("click", () => this.setOpen(false), {
-        signal: this.abortController.signal
-      });
+      const { signal } = this.abortController;
+      this.dom.trigger.addEventListener("click", () => this.setOpen(!this.open), { signal });
+      this.dom.collapseAllButton.addEventListener("click", this.options.onCollapseAll, { signal });
+      this.dom.expandAllButton.addEventListener("click", this.options.onExpandAll, { signal });
+      this.dom.closeButton.addEventListener("click", () => this.setOpen(false), { signal });
       this.dom.outline.addEventListener("click", (event) => this.handleOutlineClick(event), {
-        signal: this.abortController.signal
+        signal
       });
       window.addEventListener("resize", () => this.handleViewportChange(), {
-        signal: this.abortController.signal,
+        signal,
         passive: true
       });
       window.addEventListener("keydown", (event) => this.handleKeydown(event), {
-        signal: this.abortController.signal
+        signal
       });
     }
     handleOutlineClick(event) {
-      const button = event.target?.closest(".ghcm-outline-link");
+      const button = event.target instanceof Element ? event.target.closest(".ghcm-outline-link") : null;
       const key = button?.dataset.key;
       if (!key) {
         return;
       }
       this.options.onJump(key);
-      if (!this.desktop) {
+      if (this.layout.getPlacement() === "overlay") {
         this.setOpen(false);
       }
     }
     handleKeydown(event) {
-      if (event.key === "Escape" && !this.desktop && this.open) {
+      if (event.key === "Escape" && this.open && this.layout.getPlacement() === "overlay") {
+        event.preventDefault();
         this.setOpen(false);
       }
     }
     handleViewportChange(force = false) {
-      const nextDesktop = window.innerWidth >= DESKTOP_BREAKPOINT;
-      const nextOpen = force || nextDesktop !== this.desktop ? nextDesktop : this.open;
-      if (force || nextDesktop !== this.desktop) {
-        this.desktop = nextDesktop;
-      }
-      this.applyOpenState(nextOpen);
+      this.desktop = window.innerWidth >= DESKTOP_BREAKPOINT;
+      this.sync({ resetOpen: force });
     }
     applyOpenState(open) {
       const becameOpen = open && !this.open;
       this.open = open;
-      this.sync();
+      this.sync({ moveFocus: true });
       if (becameOpen) {
         this.outlineView.scheduleActiveItemVisibility(true);
       }
     }
-    sync() {
+    sync({ resetOpen = false, moveFocus = false } = {}) {
+      const previousFocus = document.activeElement;
+      const previousPlacement = this.layout.getPlacement();
       this.layout.sync(this.desktop, this.open);
       const placement = this.layout.getPlacement();
+      if (resetOpen || placement !== previousPlacement) {
+        this.open = placement === "docked";
+        this.layout.sync(this.desktop, this.open);
+      }
       const docked = placement === "docked";
       const inline = placement === "inline";
       const overlay = placement === "overlay";
@@ -2004,77 +2283,26 @@
       this.dom.root.classList.toggle("is-overlay", overlay);
       this.dom.trigger.classList.toggle("is-hidden", this.open);
       this.dom.panel.classList.toggle("is-open", this.open);
-      this.dom.backdrop.classList.toggle("is-open", this.open && overlay);
-      this.dom.closeButton.textContent = this.desktop ? "Hide" : "Close";
+      this.dom.panel.hidden = !this.open;
+      if (overlay) {
+        this.dom.panel.setAttribute("role", "dialog");
+        this.dom.trigger.setAttribute("aria-haspopup", "dialog");
+        this.dom.dragHandle.setAttribute("aria-label", "Move contents panel with arrow keys; hold Shift to move faster");
+        this.dom.dragHandle.setAttribute("role", "group");
+      } else {
+        this.dom.panel.removeAttribute("role");
+        this.dom.trigger.removeAttribute("aria-haspopup");
+        this.dom.dragHandle.removeAttribute("aria-label");
+        this.dom.dragHandle.removeAttribute("role");
+      }
+      this.dom.dragHandle.tabIndex = overlay ? 0 : -1;
+      this.dom.closeButton.textContent = overlay ? "Close" : "Hide";
       this.dom.closeButton.classList.toggle("is-hidden", !this.open);
       this.dom.trigger.setAttribute("aria-expanded", String(this.open));
+      this.focus.sync({ open: this.open, moveFocus, previousFocus });
+      this.drag.sync(overlay && this.open);
     }
   };
-  function createPanelDom() {
-    const dockRow = document.createElement("div");
-    dockRow.className = "ghcm-dock-row BorderGrid-row";
-    const dockCell = document.createElement("div");
-    dockCell.className = "ghcm-dock-cell BorderGrid-cell";
-    const root = document.createElement("div");
-    root.className = "ghcm-root";
-    const cell = document.createElement("div");
-    cell.className = "ghcm-cell";
-    const trigger = createButton("ghcm-trigger", "Contents", "Toggle contents");
-    const backdrop = createButton("ghcm-backdrop", "", "Close contents");
-    const panel = document.createElement("aside");
-    panel.className = "ghcm-panel";
-    panel.setAttribute("aria-label", "Page contents");
-    const collapseAllButton = createButton("ghcm-inline-action", "Collapse all");
-    collapseAllButton.dataset.action = "collapse-all";
-    const expandAllButton = createButton("ghcm-inline-action", "Expand all");
-    expandAllButton.dataset.action = "expand-all";
-    const closeButton = createButton("ghcm-inline-action ghcm-close-action", "Hide");
-    const outline = document.createElement("nav");
-    outline.className = "ghcm-outline";
-    outline.setAttribute("aria-label", "Page contents");
-    const shell = document.createElement("div");
-    shell.className = "ghcm-sidebar-shell";
-    const header = document.createElement("header");
-    header.className = "ghcm-sidebar-header";
-    const kicker = document.createElement("div");
-    kicker.className = "ghcm-sidebar-kicker";
-    kicker.textContent = "Contents";
-    const toolbar = document.createElement("div");
-    toolbar.className = "ghcm-sidebar-tools";
-    toolbar.append(collapseAllButton, expandAllButton, closeButton);
-    header.append(kicker, toolbar);
-    const outlineShell = document.createElement("div");
-    outlineShell.className = "ghcm-sidebar-outline";
-    outlineShell.append(outline);
-    shell.append(header, outlineShell);
-    panel.append(shell);
-    cell.append(trigger, panel);
-    root.append(cell, backdrop);
-    dockCell.append(root);
-    dockRow.append(dockCell);
-    return {
-      dockRow,
-      dockCell,
-      root,
-      trigger,
-      backdrop,
-      panel,
-      outline,
-      collapseAllButton,
-      expandAllButton,
-      closeButton
-    };
-  }
-  function createButton(className, textContent, ariaLabel) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = className;
-    button.textContent = textContent;
-    if (ariaLabel) {
-      button.setAttribute("aria-label", ariaLabel);
-    }
-    return button;
-  }
 
   // src/app/page-session-ui.ts
   var PageSessionUI = class {
@@ -2094,7 +2322,7 @@
         onExpandAll: this.options.onExpandAll,
         onJump: (key) => this.jumpToHeading(key),
         resolveDockedLayout: () => this.options.adapter.getDockedPanelLayout?.(document) ?? null,
-        resolveInlineHost: () => this.options.document.getPrimaryContainerElement()
+        resolveInlineHost: () => this.options.document.getContainerElements().find(isUsablePanelHost) ?? null
       });
       this.activeHeading = new ActiveHeadingTracker({
         getStickyTop: () => this.options.adapter.getStickyHeaderOffset(document),
@@ -2120,6 +2348,9 @@
     }
     togglePanel() {
       this.panel.setOpen(!this.panel.isOpen());
+    }
+    refreshLayout() {
+      this.panel.refreshLayout();
     }
     renderSnapshots(snapshots, displayRevision = buildHeadingDisplayRevision(snapshots)) {
       this.controls.sync(snapshots);
@@ -2221,23 +2452,12 @@
     }
     recompute() {
       this.states.clear();
-      const stack = [];
       for (const heading of this.document.headings) {
-        while (stack.length > 0 && heading.level <= stack[stack.length - 1].level) {
-          stack.pop();
-        }
-        const collapsed = this.collapsedKeys.has(heading.key);
-        const hiddenByAncestor = stack.length > 0;
+        const parentState = heading.parentKey ? this.states.get(heading.parentKey) : void 0;
         this.states.set(heading.key, {
-          collapsed,
-          hiddenByAncestor
+          collapsed: this.collapsedKeys.has(heading.key),
+          hiddenByAncestor: Boolean(parentState && (parentState.collapsed || parentState.hiddenByAncestor))
         });
-        if (collapsed) {
-          stack.push({
-            key: heading.key,
-            level: heading.level
-          });
-        }
       }
     }
   };
@@ -2253,8 +2473,10 @@
       __publicField(this, "ui");
       __publicField(this, "abortController", new AbortController());
       __publicField(this, "initialPageState");
+      __publicField(this, "displayHeadings");
       __publicField(this, "lastPersistedStateRevision");
       __publicField(this, "unsubscribeEngine", null);
+      this.displayHeadings = this.document.headings;
       this.initialPageState = this.storage.getPageState(this.pageKey);
       this.lastPersistedStateRevision = serializePageState(this.initialPageState);
       this.engine = new CollapseEngine(this.document, this.getInitialCollapsedKeys());
@@ -2290,13 +2512,17 @@
     togglePanel() {
       this.ui.togglePanel();
     }
+    refreshLayout() {
+      this.ui.refreshLayout();
+    }
     clearPageMemory() {
       this.lastPersistedStateRevision = serializePageState(createEmptyPageState());
       this.storage.clearPage(this.pageKey);
       this.engine.expandAll();
     }
     refreshDisplay(headings, displayRevision) {
-      this.ui.renderSnapshots(this.engine.getSnapshotsForHeadings(headings), displayRevision);
+      this.displayHeadings = headings;
+      this.renderSnapshots(displayRevision);
     }
     getInitialCollapsedKeys() {
       return this.document.filterKnownHeadingKeys(
@@ -2304,8 +2530,11 @@
       );
     }
     handleEngineChange() {
-      this.ui.renderSnapshots(this.engine.getSnapshots());
+      this.renderSnapshots();
       this.persistState();
+    }
+    renderSnapshots(displayRevision) {
+      this.ui.renderSnapshots(this.engine.getSnapshotsForHeadings(this.displayHeadings), displayRevision);
     }
     persistState() {
       const nextPageState = this.buildPageState();
@@ -2641,6 +2870,7 @@
         if (!hasSamePageDisplay(this.lastPageVersion, spec.version)) {
           this.session.refreshDisplay(spec.document.headings, spec.version.display);
         }
+        this.session.refreshLayout();
         this.lastPageVersion = spec.version;
         return;
       }

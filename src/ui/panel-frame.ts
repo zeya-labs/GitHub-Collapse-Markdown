@@ -38,16 +38,21 @@ export function measureDockedPanel(
 ): DockedPanelMeasurement {
   const rowRect = elements.dockRow.getBoundingClientRect();
   const cellRect = elements.dockCell.getBoundingClientRect();
+  const cellStyle = window.getComputedStyle(elements.dockCell);
+  const inset = (property: string) => Number.parseFloat(cellStyle.getPropertyValue(property)) || 0;
+  const leftInset = inset("padding-left") + inset("border-left-width");
+  const rightInset = inset("padding-right") + inset("border-right-width");
+  const topInset = inset("padding-top") + inset("border-top-width");
   const dockedBoundaryRect = context.boundary?.getBoundingClientRect();
 
   return {
     boundaryViewportBottom: dockedBoundaryRect
       ? dockedBoundaryRect.bottom - DOCKED_PANEL_BOUNDARY_BOTTOM_GAP
       : Number.POSITIVE_INFINITY,
-    cellLeft: Math.max(cellRect.left, 0),
-    cellWidth: Math.max(cellRect.width, 0),
+    cellLeft: Math.max(cellRect.left + leftInset, 0),
+    cellWidth: Math.max(cellRect.width - leftInset - rightInset, 0),
     naturalPanelHeight: Math.max(elements.panel.scrollHeight, elements.panel.offsetHeight, 0),
-    rowViewportTop: rowRect.top
+    rowViewportTop: rowRect.top + topInset
   };
 }
 

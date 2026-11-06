@@ -70,7 +70,7 @@ export class ActiveHeadingTracker {
 
   private refreshHeadingPositions(snapshots: HeadingSnapshot[]): void {
     const nextSignature = snapshots
-      .map((heading) => `${heading.key}:${heading.hiddenByAncestor ? "hidden" : "visible"}`)
+      .map((heading) => `${heading.key}:${heading.collapsed}:${heading.hiddenByAncestor}:${heading.text}`)
       .join("|");
     if (!this.positionsDirty && nextSignature === this.positionsSignature) {
       return;

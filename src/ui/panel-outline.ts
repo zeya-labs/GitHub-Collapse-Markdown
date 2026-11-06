@@ -1,4 +1,5 @@
 import type { HeadingSnapshot } from "../core/types";
+import { getPreferredScrollBehavior } from "../utils/dom";
 
 export interface PanelRenderState {
   headings: HeadingSnapshot[];
@@ -12,7 +13,9 @@ export class PanelOutlineView {
   private activeHeadingKey: string | null = null;
   private readonly itemElements = new Map<string, HTMLButtonElement>();
 
-  constructor(private readonly outline: HTMLElement) {}
+  constructor(private readonly outline: HTMLElement) {
+    this.outline.tabIndex = -1;
+  }
 
   destroy(): void {
     window.cancelAnimationFrame(this.visibilityRaf);
@@ -66,7 +69,7 @@ export class PanelOutlineView {
     if (typeof this.outline.scrollTo === "function") {
       this.outline.scrollTo({
         top: targetTop,
-        behavior: "smooth"
+        behavior: getPreferredScrollBehavior()
       });
       return;
     }
@@ -75,21 +78,32 @@ export class PanelOutlineView {
   }
 
   private renderStructure(headings: HeadingSnapshot[]): void {
+    const focused = document.activeElement;
+    const focusedKey = focused instanceof HTMLElement && this.outline.contains(focused)
+      ? focused.closest<HTMLButtonElement>(".ghcm-outline-link")?.dataset.key
+      : undefined;
     this.itemElements.clear();
-    this.outline.replaceChildren();
     this.activeHeadingKey = null;
+    this.outline.replaceChildren(this.createOutlineContent(headings));
 
+    if (focusedKey) {
+      const next = this.itemElements.get(focusedKey) ?? this.itemElements.values().next().value ?? this.outline;
+      next.focus({ preventScroll: true });
+    }
+  }
+
+  private createOutlineContent(headings: HeadingSnapshot[]): DocumentFragment {
+    const fragment = document.createDocumentFragment();
     if (headings.length === 0) {
       const empty = document.createElement("p");
       empty.className = "ghcm-outline-empty";
       empty.textContent = "No headings found.";
-      this.outline.append(empty);
-      return;
+      fragment.append(empty);
+      return fragment;
     }
 
     const minLevel = headings.reduce((lowest, heading) => Math.min(lowest, heading.level), headings[0]?.level ?? 1);
     const showGroups = new Set(headings.map((heading) => heading.container.key)).size > 1;
-    const fragment = document.createDocumentFragment();
     let currentGroupKey = "";
     let currentGroup: HTMLElement | null = null;
 
@@ -117,7 +131,7 @@ export class PanelOutlineView {
       }
     });
 
-    this.outline.append(fragment);
+    return fragment;
   }
 
   private syncItemStates(headings: HeadingSnapshot[]): void {

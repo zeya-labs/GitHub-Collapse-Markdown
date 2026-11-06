@@ -33,6 +33,33 @@ describe("PageSession", () => {
     document.body.innerHTML = "";
   });
 
+  it("keeps refreshed heading text through subsequent collapse and expand operations", () => {
+    const container = createContainer(`
+      <article class="markdown-body">
+        <h2 id="intro">Intro</h2>
+        <p id="intro-copy">alpha</p>
+      </article>
+    `);
+    const pageDocument = buildDocument([container]);
+    session = new PageSession("github.com/test", adapter, pageDocument, new StorageService());
+    session.mount();
+
+    const heading = document.getElementById("intro") as HTMLElement;
+    const headingText = Array.from(heading.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+    heading.replaceChild(document.createTextNode("Updated introduction"), headingText as ChildNode);
+    const updatedDocument = buildDocument([container]);
+    session.refreshDisplay(updatedDocument.headings, "updated-heading-text");
+    expect(document.querySelector(".ghcm-outline")?.textContent).toContain("Updated introduction");
+
+    session.collapseAll();
+    expect(document.getElementById("intro-copy")?.classList.contains("ghcm-section-hidden")).toBe(true);
+    expect(document.querySelector(".ghcm-outline")?.textContent).toContain("Updated introduction");
+
+    session.expandAll();
+    expect(document.getElementById("intro-copy")?.classList.contains("ghcm-section-hidden")).toBe(false);
+    expect(document.querySelector(".ghcm-outline")?.textContent).toContain("Updated introduction");
+  });
+
   it("restores collapsed headings from page memory on mount", () => {
     const container = createContainer(`
       <article class="markdown-body">

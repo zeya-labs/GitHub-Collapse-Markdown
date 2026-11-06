@@ -89,27 +89,13 @@ export class CollapseEngine {
 
   private recompute(): void {
     this.states.clear();
-    const stack: Array<{ key: string; level: number }> = [];
 
     for (const heading of this.document.headings) {
-      while (stack.length > 0 && heading.level <= stack[stack.length - 1].level) {
-        stack.pop();
-      }
-
-      const collapsed = this.collapsedKeys.has(heading.key);
-      const hiddenByAncestor = stack.length > 0;
-
+      const parentState = heading.parentKey ? this.states.get(heading.parentKey) : undefined;
       this.states.set(heading.key, {
-        collapsed,
-        hiddenByAncestor
+        collapsed: this.collapsedKeys.has(heading.key),
+        hiddenByAncestor: Boolean(parentState && (parentState.collapsed || parentState.hiddenByAncestor))
       });
-
-      if (collapsed) {
-        stack.push({
-          key: heading.key,
-          level: heading.level
-        });
-      }
     }
   }
 }

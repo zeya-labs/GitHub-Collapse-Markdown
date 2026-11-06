@@ -14,7 +14,7 @@ export const gistAdapter: SiteAdapter = {
   findContainers(document) {
     return buildContentContainers(
       "gist",
-      queryContentCandidates(document, GIST_CONTENT_ROOT_SELECTOR, ".ghcm-root"),
+      queryContentCandidates(document, GIST_CONTENT_ROOT_SELECTOR),
       (_element, index) => ({
         id: index === 0 ? "gist" : `gist:${index + 1}`,
         label: index === 0 ? "Gist" : `Gist Section ${index + 1}`,

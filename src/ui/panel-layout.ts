@@ -16,7 +16,7 @@ import {
 
 interface DockedPanelLayoutElements extends DockedPanelFrameElements, DockedPanelMeasureElements {}
 
-export class DockedPanelLayout {
+export class PanelLayout {
   private desktop = false;
   private open = false;
   private placement: ResolvedPanelPlacement = { kind: "overlay" };
@@ -24,7 +24,6 @@ export class DockedPanelLayout {
   private resizeObserver: ResizeObserver | null = null;
   private layoutMutationObserver: MutationObserver | null = null;
   private observedDockElements: HTMLElement[] = [];
-  private styledPrecedingDockRow: HTMLElement | null = null;
   private measurementDirty = true;
 
   constructor(
@@ -65,7 +64,6 @@ export class DockedPanelLayout {
     this.placement = resolvePanelPlacement(this.desktop, this.resolvers);
     this.mountPlacement(this.placement);
     this.syncLayoutObservers(this.placement);
-    this.syncPrecedingDockRow(this.placement);
     this.elements.root.style.setProperty(
       "--ghcm-sticky-top",
       `${this.placement.kind === "docked" ? this.placement.context.topOffset : 0}px`
@@ -80,6 +78,9 @@ export class DockedPanelLayout {
     }
 
     if (placement.kind === "docked") {
+      const nativeGrid = placement.context.host.classList.contains("BorderGrid");
+      this.elements.dockRow.classList.toggle("BorderGrid-row", nativeGrid);
+      this.elements.dockCell.classList.toggle("BorderGrid-cell", nativeGrid);
       if (this.elements.root.parentElement !== this.elements.dockCell) {
         this.elements.dockCell.append(this.elements.root);
       }
@@ -138,7 +139,6 @@ export class DockedPanelLayout {
 
     if (placement.kind === "docked") {
       this.layoutMutationObserver = new MutationObserver(() => {
-        this.syncPrecedingDockRow(this.placement);
         this.invalidateGeometry();
       });
       this.layoutMutationObserver.observe(placement.context.host, {
@@ -152,7 +152,6 @@ export class DockedPanelLayout {
     this.resizeObserver = null;
     this.layoutMutationObserver?.disconnect();
     this.layoutMutationObserver = null;
-    this.clearPrecedingDockRow();
     this.observedDockElements = [];
   }
 
@@ -168,27 +167,6 @@ export class DockedPanelLayout {
 
   private shouldPositionDockedPanel(): boolean {
     return this.desktop && this.placement.kind === "docked" && this.open;
-  }
-
-  private syncPrecedingDockRow(placement: ResolvedPanelPlacement): void {
-    this.clearPrecedingDockRow();
-
-    if (placement.kind !== "docked") {
-      return;
-    }
-
-    const previousRow = this.elements.dockRow.previousElementSibling;
-    if (!(previousRow instanceof HTMLElement)) {
-      return;
-    }
-
-    previousRow.classList.add("ghcm-preceding-dock-row");
-    this.styledPrecedingDockRow = previousRow;
-  }
-
-  private clearPrecedingDockRow(): void {
-    this.styledPrecedingDockRow?.classList.remove("ghcm-preceding-dock-row");
-    this.styledPrecedingDockRow = null;
   }
 
   private updateDockedPosition(): void {

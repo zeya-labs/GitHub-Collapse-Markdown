@@ -2,10 +2,12 @@ export const outlineStyles = `
   .ghcm-outline {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    height: 100%;
+    flex: 1 1 auto;
+    gap: 0;
     min-height: 0;
     overflow: auto;
+    overscroll-behavior: contain;
+    margin: 0;
     padding: 0;
     scrollbar-width: thin;
     scrollbar-color: rgba(101, 109, 118, 0.36) transparent;
@@ -30,11 +32,11 @@ export const outlineStyles = `
   }
 
   .ghcm-outline-group + .ghcm-outline-group {
-    margin-top: 12px;
+    margin-top: var(--ghcm-space-2);
   }
 
-  .ghcm-outline-group-title {
-    margin: 0 0 6px;
+  .ghcm-root .ghcm-outline-group-title {
+    margin: 0 0 var(--ghcm-space-1);
     font-size: 11px;
     font-weight: 600;
     line-height: 16px;
@@ -45,14 +47,17 @@ export const outlineStyles = `
     --ghcm-level-accent: var(--ghcm-h4);
     appearance: none;
     display: grid;
+    flex-shrink: 0;
     grid-template-columns: 2px minmax(0, 1fr);
     align-items: start;
-    gap: 8px;
+    gap: var(--ghcm-space-2);
     width: 100%;
     border: none;
     background: transparent;
-    border-radius: 6px;
-    padding: 5px 8px 5px calc(8px + (var(--ghcm-depth, 0) * 12px));
+    border-radius: 4px;
+    margin: 0;
+    padding: var(--ghcm-space-1) var(--ghcm-space-1) var(--ghcm-space-1)
+      calc(var(--ghcm-space-1) + (var(--ghcm-depth, 0) * var(--ghcm-space-3)));
     cursor: pointer;
     text-align: left;
     transition: background-color 120ms ease, opacity 120ms ease;
@@ -125,33 +130,15 @@ export const outlineStyles = `
     font-weight: 600;
   }
 
-  .ghcm-outline-empty {
+  .ghcm-root .ghcm-outline-empty {
     margin: 0;
-    padding: 8px 0;
+    padding: var(--ghcm-space-2) 0;
     color: var(--ghcm-ink-muted);
     font-size: 12px;
     line-height: 1.5;
   }
 
-  .ghcm-root.is-overlay .ghcm-outline-link {
-    border-radius: 8px;
-    padding: 7px 10px 7px calc(10px + (var(--ghcm-depth, 0) * 14px));
-  }
-
-  .ghcm-root.is-overlay .ghcm-outline-label {
-    font-size: 13px;
-  }
-
-  .ghcm-root.is-docked .ghcm-outline {
-    gap: 1px;
-  }
-
-  .ghcm-root.is-docked .ghcm-outline-link {
-    border-radius: 0;
-    padding: 4px 0 4px calc(var(--ghcm-depth, 0) * 12px);
-  }
-
-  .ghcm-root.is-docked .ghcm-outline-group-title {
-    margin-bottom: 4px;
+  .ghcm-root.is-inline .ghcm-outline {
+    max-height: min(45dvh, 420px);
   }
 `;

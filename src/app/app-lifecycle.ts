@@ -40,7 +40,13 @@ export class AppLifecycle {
       }
     });
 
-    this.observer.observe(document.documentElement, { childList: true, subtree: true });
+    this.observer.observe(document.documentElement, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["hidden", "aria-hidden", "open", "style", "class"]
+    });
   }
 
   destroy(): void {

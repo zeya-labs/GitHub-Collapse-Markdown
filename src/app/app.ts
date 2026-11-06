@@ -108,6 +108,7 @@ export class GitHubCollapseMarkdownApp {
       if (!hasSamePageDisplay(this.lastPageVersion, spec.version)) {
         this.session.refreshDisplay(spec.document.headings, spec.version.display);
       }
+      this.session.refreshLayout();
       this.lastPageVersion = spec.version;
       return;
     }

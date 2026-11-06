@@ -10,6 +10,7 @@ export class PageSession {
   private readonly ui: PageSessionUI;
   private readonly abortController = new AbortController();
   private readonly initialPageState: PageState;
+  private displayHeadings: HeadingRecord[];
   private lastPersistedStateRevision: string;
   private unsubscribeEngine: (() => void) | null = null;
 
@@ -19,6 +20,7 @@ export class PageSession {
     private readonly document: PageDocument,
     private readonly storage: StorageService
   ) {
+    this.displayHeadings = this.document.headings;
     this.initialPageState = this.storage.getPageState(this.pageKey);
     this.lastPersistedStateRevision = serializePageState(this.initialPageState);
     this.engine = new CollapseEngine(this.document, this.getInitialCollapsedKeys());
@@ -61,6 +63,10 @@ export class PageSession {
     this.ui.togglePanel();
   }
 
+  refreshLayout(): void {
+    this.ui.refreshLayout();
+  }
+
   clearPageMemory(): void {
     this.lastPersistedStateRevision = serializePageState(createEmptyPageState());
     this.storage.clearPage(this.pageKey);
@@ -68,7 +74,8 @@ export class PageSession {
   }
 
   refreshDisplay(headings: HeadingRecord[], displayRevision: string): void {
-    this.ui.renderSnapshots(this.engine.getSnapshotsForHeadings(headings), displayRevision);
+    this.displayHeadings = headings;
+    this.renderSnapshots(displayRevision);
   }
 
   private getInitialCollapsedKeys(): string[] {
@@ -78,8 +85,12 @@ export class PageSession {
   }
 
   private handleEngineChange(): void {
-    this.ui.renderSnapshots(this.engine.getSnapshots());
+    this.renderSnapshots();
     this.persistState();
+  }
+
+  private renderSnapshots(displayRevision?: string): void {
+    this.ui.renderSnapshots(this.engine.getSnapshotsForHeadings(this.displayHeadings), displayRevision);
   }
 
   private persistState(): void {

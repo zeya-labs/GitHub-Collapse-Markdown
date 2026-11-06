@@ -1,10 +1,14 @@
 import { normalizeWhitespace } from "./strings";
 
+export function getPreferredScrollBehavior(): ScrollBehavior {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth";
+}
+
 export function scrollToElementWithOffset(element: HTMLElement, offset: number): void {
   const top = element.getBoundingClientRect().top + window.scrollY - offset;
   window.scrollTo({
     top: Math.max(top, 0),
-    behavior: "smooth"
+    behavior: getPreferredScrollBehavior()
   });
 }
 

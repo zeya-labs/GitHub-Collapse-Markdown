@@ -1,6 +1,6 @@
 # GitHub Collapse Markdown
 
-![Version](https://img.shields.io/badge/version-5.1.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-5.2.0-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Userscript](https://img.shields.io/badge/userscript-Tampermonkey%2FViolentmonkey-orange.svg)
 
@@ -30,7 +30,9 @@ GitHub 上的长文档通常有这些问题：
 - 同级批量折叠
   `Shift + 点击标题` 可以同时折叠或展开当前层级的同级标题
 - 页面大纲
-  侧边面板显示当前文档结构，支持点击跳转
+  优先嵌入可用侧栏；没有合适侧栏时，在 Markdown 内显示紧凑的 Contents 入口，手机也优先内嵌
+- 浮动目录
+  只有找不到安全插入位置时才显示浮窗入口。拖动 Contents 标题可移动窗口，也可聚焦标题后用方向键移动（Shift 加速）；窗口不会锁住背景页面
 - 全部折叠 / 全部展开
   适合快速收起长文或恢复完整视图
 - 页面记忆
@@ -46,6 +48,7 @@ GitHub 上的长文档通常有这些问题：
   - Pull Request 正文
   - 评论区 Markdown 内容
   - Wiki
+  - Discussions、Releases、代码审查评论和可见的 Markdown 预览
 - `gist.github.com`
 - `docs.github.com`
 - `help.github.com`
@@ -78,7 +81,7 @@ GitHub 上的长文档通常有这些问题：
    - [Violentmonkey](https://violentmonkey.github.io/)
 2. 安装脚本
    - 直接安装仓库根目录脚本：
-     [`main.js` 原始链接](https://raw.githubusercontent.com/Xyea/GitHub-Collapse-Markdown/main/main.js)
+     [`main.js` 原始链接](https://raw.githubusercontent.com/zeya-labs/GitHub-Collapse-Markdown/main/main.js)
    - 或使用构建产物：
      `dist/github-collapse-markdown.user.js`
 

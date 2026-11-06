@@ -3,34 +3,28 @@ export const baseStyles = `
     all: initial;
     display: block;
     width: 100%;
-    font-family:
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      "Noto Sans",
-      "Helvetica Neue",
-      Arial,
-      sans-serif,
-      "Apple Color Emoji",
-      "Segoe UI Emoji";
-    color: var(--fgColor-default, #1f2328);
-    --ghcm-ink: var(--fgColor-default, #1f2328);
-    --ghcm-ink-soft: var(--fgColor-muted, #59636e);
-    --ghcm-ink-muted: var(--fgColor-muted, #656d76);
-    --ghcm-line: var(--borderColor-default, #d0d7de);
-    --ghcm-line-muted: var(--borderColor-muted, #d8dee4);
-    --ghcm-surface: var(--bgColor-default, #ffffff);
-    --ghcm-surface-subtle: var(--bgColor-muted, #f6f8fa);
-    --ghcm-surface-accent: var(--bgColor-accent-muted, rgba(9, 105, 218, 0.08));
-    --ghcm-shadow: rgba(31, 35, 40, 0.08);
-    --ghcm-shadow-strong: rgba(31, 35, 40, 0.12);
-    --ghcm-accent: var(--fgColor-accent, #0969da);
-    --ghcm-h1: var(--fgColor-default, #24292f);
-    --ghcm-h2: var(--fgColor-default, #24292f);
-    --ghcm-h3: var(--fgColor-default, #24292f);
-    --ghcm-h4: var(--fgColor-muted, #57606a);
-    --ghcm-h5: var(--fgColor-muted, #57606a);
-    --ghcm-h6: var(--fgColor-muted, #57606a);
+    min-width: 0;
+    font: inherit;
+    color: var(--fgColor-default, var(--color-fg-default, inherit));
+    --ghcm-space-1: var(--base-size-4, 4px);
+    --ghcm-space-2: var(--base-size-8, 8px);
+    --ghcm-space-3: var(--base-size-12, 12px);
+    --ghcm-space-4: var(--base-size-16, 16px);
+    --ghcm-ink: var(--fgColor-default, var(--color-fg-default, currentColor));
+    --ghcm-ink-soft: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+    --ghcm-ink-muted: var(--ghcm-ink-soft);
+    --ghcm-line: var(--borderColor-default, var(--color-border-default, #d0d7de));
+    --ghcm-line-muted: var(--borderColor-muted, var(--color-border-muted, #d8dee4));
+    --ghcm-surface: var(--bgColor-default, var(--color-canvas-default, #ffffff));
+    --ghcm-surface-subtle: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
+    --ghcm-surface-accent: var(--bgColor-accent-muted, var(--color-accent-subtle, rgba(9, 105, 218, 0.08)));
+    --ghcm-accent: var(--fgColor-accent, var(--color-accent-fg, #0969da));
+    --ghcm-h1: var(--ghcm-ink);
+    --ghcm-h2: var(--ghcm-ink);
+    --ghcm-h3: var(--ghcm-ink);
+    --ghcm-h4: var(--ghcm-ink-soft);
+    --ghcm-h5: var(--ghcm-ink-soft);
+    --ghcm-h6: var(--ghcm-ink-soft);
   }
 
   .ghcm-root,
@@ -38,6 +32,19 @@ export const baseStyles = `
   .ghcm-root *::before,
   .ghcm-root *::after {
     box-sizing: border-box;
+  }
+
+  .ghcm-root button {
+    font-family: inherit;
+  }
+
+  .ghcm-root :is(.ghcm-trigger, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
+    outline: 2px solid var(--ghcm-accent);
+    outline-offset: 2px;
+  }
+
+  .ghcm-root .ghcm-outline-link:focus-visible {
+    outline-offset: -2px;
   }
 
   .ghcm-cell {
@@ -50,33 +57,30 @@ export const baseStyles = `
     overflow: visible;
   }
 
-  .ghcm-dock-row {
-    border-top: 0 !important;
-  }
-
-  .ghcm-preceding-dock-row,
-  .ghcm-preceding-dock-row > .BorderGrid-cell,
-  .ghcm-preceding-dock-row > [class*="BorderGrid-cell"] {
-    border-bottom: 0 !important;
-  }
-
-  .ghcm-dock-cell {
-    border: 0 !important;
-    padding: 0 !important;
+  .ghcm-dock-row:not(.BorderGrid-row) {
+    margin-top: var(--base-size-16, 16px);
+    padding-top: var(--base-size-16, 16px);
+    border-top: 1px solid var(--borderColor-muted, var(--color-border-muted, #d8dee4));
   }
 
   .ghcm-root.is-docked {
     position: relative;
-    top: auto;
     z-index: 2;
   }
 
   .ghcm-root.is-inline {
-    margin: 0 0 24px;
+    margin-bottom: var(--ghcm-space-2);
   }
 
-  .ghcm-section-hidden,
-  .ghcm-hidden-by-parent {
-    display: none !important;
+  .markdown-body > .ghcm-root + :is(h1, h2, h3, h4, h5, h6, .markdown-heading) {
+    margin-top: 0 !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ghcm-root *,
+    .ghcm-heading-toggle {
+      transition: none !important;
+      scroll-behavior: auto !important;
+    }
   }
 `;

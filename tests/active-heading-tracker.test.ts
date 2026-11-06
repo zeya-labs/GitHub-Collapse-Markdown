@@ -20,6 +20,78 @@ describe("ActiveHeadingTracker", () => {
     document.body.innerHTML = "";
   });
 
+  it("remeasures later headings when a section without descendant headings is collapsed or expanded", () => {
+    const container = createContainer(`
+      <article class="markdown-body">
+        <h2 id="first">First</h2>
+        <p>Long section content</p>
+        <h2 id="second">Second</h2>
+        <p>Following section content</p>
+      </article>
+    `);
+    const pageDocument = buildDocument([container]);
+    const [first, second] = pageDocument.headings;
+    const engine = new CollapseEngine(pageDocument, []);
+    vi.spyOn(document.getElementById("first") as HTMLElement, "getBoundingClientRect")
+      .mockImplementation(() => DOMRect.fromRect({ y: 100, width: 100, height: 24 }));
+    vi.spyOn(document.getElementById("second") as HTMLElement, "getBoundingClientRect")
+      .mockImplementation(() => DOMRect.fromRect({
+        y: engine.isCollapsed(first.key) ? 200 : 500,
+        width: 100,
+        height: 24
+      }));
+    const tracker = new ActiveHeadingTracker({
+      getStickyTop: () => 292,
+      resolveBinding: (key) => pageDocument.getBinding(key)
+    });
+
+    tracker.sync(engine.getSnapshots());
+    expect(tracker.getActiveHeadingKey()).toBe(first.key);
+
+    engine.toggle(first.key);
+    tracker.sync(engine.getSnapshots());
+    expect(tracker.getActiveHeadingKey()).toBe(second.key);
+
+    engine.toggle(first.key);
+    tracker.sync(engine.getSnapshots());
+    expect(tracker.getActiveHeadingKey()).toBe(first.key);
+  });
+
+  it("remeasures later headings when updated heading text wraps onto more lines", () => {
+    const container = createContainer(`
+      <article class="markdown-body">
+        <h2 id="first">First</h2>
+        <p>Section content</p>
+        <h2 id="second">Second</h2>
+        <p>Following content</p>
+      </article>
+    `);
+    const pageDocument = buildDocument([container]);
+    const [first, second] = pageDocument.headings;
+    const engine = new CollapseEngine(pageDocument, []);
+    const firstElement = document.getElementById("first") as HTMLElement;
+    vi.spyOn(firstElement, "getBoundingClientRect")
+      .mockImplementation(() => DOMRect.fromRect({ y: 100, width: 100, height: 24 }));
+    vi.spyOn(document.getElementById("second") as HTMLElement, "getBoundingClientRect")
+      .mockImplementation(() => DOMRect.fromRect({
+        y: firstElement.textContent === "First" ? 280 : 360,
+        width: 100,
+        height: 24
+      }));
+    const tracker = new ActiveHeadingTracker({
+      getStickyTop: () => 292,
+      resolveBinding: (key) => pageDocument.getBinding(key)
+    });
+
+    tracker.sync(engine.getSnapshots());
+    expect(tracker.getActiveHeadingKey()).toBe(second.key);
+
+    firstElement.textContent = "An updated heading that wraps onto several additional lines";
+    const updatedDocument = buildDocument([container]);
+    tracker.sync(engine.getSnapshotsForHeadings(updatedDocument.headings), true);
+    expect(tracker.getActiveHeadingKey()).toBe(first.key);
+  });
+
   it("ignores hidden descendant headings when resolving the active heading", () => {
     const container = createContainer(`
       <article class="markdown-body">
