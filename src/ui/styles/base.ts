@@ -8,15 +8,15 @@ export const baseStyles = `
     color: var(--fgColor-default, var(--color-fg-default, inherit));
     --ghcm-space-1: var(--base-size-4, 4px);
     --ghcm-space-2: var(--base-size-8, 8px);
-    --ghcm-space-3: var(--base-size-12, 12px);
     --ghcm-space-4: var(--base-size-16, 16px);
     --ghcm-ink: var(--fgColor-default, var(--color-fg-default, currentColor));
     --ghcm-ink-soft: var(--fgColor-muted, var(--color-fg-muted, #59636e));
     --ghcm-ink-muted: var(--ghcm-ink-soft);
     --ghcm-line: var(--borderColor-default, var(--color-border-default, #d0d7de));
     --ghcm-surface: var(--bgColor-default, var(--color-canvas-default, #ffffff));
-    --ghcm-surface-subtle: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
-    --ghcm-surface-accent: var(--bgColor-accent-muted, var(--color-accent-subtle, rgba(9, 105, 218, 0.08)));
+    --ghcm-hover: var(--control-transparent-bgColor-hover, var(--color-action-list-item-default-hover-bg, rgba(129, 139, 152, 0.1)));
+    --ghcm-pressed: var(--control-transparent-bgColor-active, var(--color-action-list-item-default-active-bg, rgba(129, 139, 152, 0.15)));
+    --ghcm-radius: var(--borderRadius-medium, 6px);
     --ghcm-accent: var(--fgColor-accent, var(--color-accent-fg, #0969da));
   }
 
@@ -31,12 +31,13 @@ export const baseStyles = `
     font-family: inherit;
   }
 
-  .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
-    outline: 2px solid var(--ghcm-accent);
-    outline-offset: 2px;
+  .ghcm-root :is(button, summary) {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .ghcm-root .ghcm-outline-link:focus-visible {
+  .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
+    outline: 2px solid var(--focus-outlineColor, var(--ghcm-accent));
     outline-offset: -2px;
   }
 

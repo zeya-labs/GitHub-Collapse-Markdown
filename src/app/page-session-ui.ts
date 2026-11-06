@@ -34,6 +34,7 @@ export class PageSessionUI {
       onCollapseAll: this.options.onCollapseAll,
       onExpandAll: this.options.onExpandAll,
       onJump: (key) => this.jumpToHeading(key),
+      onLayoutChange: () => this.refreshActiveHeading(),
       resolveDockedLayout: () => this.options.adapter.getDockedPanelLayout?.(document) ?? null,
       resolveInlineHost: () => this.options.document.getContainerElements().find(isUsablePanelHost) ?? null
     });
@@ -106,5 +107,12 @@ export class PageSessionUI {
       ...patch
     };
     this.panel.render(this.panelState);
+  }
+
+  private refreshActiveHeading(): void {
+    this.activeHeading.invalidateLayout();
+    if (this.activeHeading.sync(this.panelState.headings)) {
+      this.updatePanelState({ activeHeadingKey: this.activeHeading.getActiveHeadingKey() });
+    }
   }
 }

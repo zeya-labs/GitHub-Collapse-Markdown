@@ -1,5 +1,5 @@
 export const responsiveStyles = `
-  @media (max-width: 1179px), (pointer: coarse) {
+  @media (pointer: coarse) {
     .ghcm-root .ghcm-trigger,
     .ghcm-root .ghcm-actions-trigger,
     .ghcm-root .ghcm-close-action,

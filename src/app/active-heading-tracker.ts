@@ -54,6 +54,10 @@ export class ActiveHeadingTracker {
     return this.activeHeadingKey;
   }
 
+  invalidateLayout(): void {
+    this.positionsDirty = true;
+  }
+
   setActiveHeadingKey(activeHeadingKey: string | null, force = false): boolean {
     if (!force && activeHeadingKey === this.activeHeadingKey) {
       return false;

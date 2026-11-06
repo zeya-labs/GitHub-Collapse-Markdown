@@ -12,6 +12,7 @@ interface PanelUIOptions extends PanelPlacementResolvers {
   onCollapseAll: () => void;
   onExpandAll: () => void;
   onJump: (key: string) => void;
+  onLayoutChange?: () => void;
 }
 
 export class PanelUI {
@@ -27,6 +28,7 @@ export class PanelUI {
   private mounted = false;
   private desktop = false;
   private open = false;
+  private layoutChangeRaf = 0;
 
   constructor(private readonly options: PanelUIOptions) {
     this.layout = new PanelLayout(
@@ -60,6 +62,7 @@ export class PanelUI {
 
   destroy(): void {
     this.abortController.abort();
+    window.cancelAnimationFrame(this.layoutChangeRaf);
     this.focus.destroy();
     this.actions.destroy();
     this.drag.destroy();
@@ -92,6 +95,7 @@ export class PanelUI {
     }
     if (structureChanged) {
       this.layout.refreshGeometry();
+      this.scheduleLayoutChange();
     }
   }
 
@@ -141,17 +145,22 @@ export class PanelUI {
   }
 
   private applyOpenState(open: boolean): void {
+    const changed = open !== this.open;
     const becameOpen = open && !this.open;
     this.open = open;
     this.sync({ moveFocus: true });
     if (becameOpen) {
       this.outlineView.scheduleActiveItemVisibility(true);
     }
+    if (changed) {
+      this.scheduleLayoutChange();
+    }
   }
 
   private sync({ resetOpen = false, moveFocus = false } = {}): void {
     const previousFocus = document.activeElement;
     const previousPlacement = this.layout.getPlacement();
+    const previousOpen = this.open;
     this.layout.sync(this.desktop, this.open);
     const placement = this.layout.getPlacement();
     if (resetOpen || placement !== previousPlacement) {
@@ -164,5 +173,20 @@ export class PanelUI {
     updatePanelDom(this.dom, placement, this.open);
     this.focus.sync({ open: this.open, moveFocus, previousFocus });
     this.drag.sync(placement === "overlay" && this.open);
+    if (placement !== previousPlacement || this.open !== previousOpen) {
+      this.scheduleLayoutChange();
+    }
+  }
+
+  private scheduleLayoutChange(): void {
+    if (!this.options.onLayoutChange) {
+      return;
+    }
+
+    window.cancelAnimationFrame(this.layoutChangeRaf);
+    this.layoutChangeRaf = window.requestAnimationFrame(() => {
+      this.layoutChangeRaf = 0;
+      this.options.onLayoutChange?.();
+    });
   }
 }

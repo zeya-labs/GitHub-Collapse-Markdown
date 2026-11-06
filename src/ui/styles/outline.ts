@@ -43,31 +43,49 @@ export const outlineStyles = `
     color: var(--ghcm-ink-muted);
   }
 
-  .ghcm-outline-link {
+  .ghcm-root .ghcm-outline-link {
     appearance: none;
     display: flex;
+    position: relative;
     flex-shrink: 0;
     align-items: center;
     width: 100%;
-    min-height: 28px;
+    min-height: var(--control-medium-size, 32px);
     border: none;
     background: transparent;
-    border-radius: 4px;
+    border-radius: var(--ghcm-radius, 6px);
     margin: 0;
-    padding: var(--ghcm-space-1) var(--ghcm-space-2) var(--ghcm-space-1)
-      calc(var(--ghcm-space-2) + (var(--ghcm-depth, 0) * var(--ghcm-space-3)));
+    padding: var(--control-medium-paddingBlock, 6px) var(--control-medium-paddingInline-condensed, 8px)
+      var(--control-medium-paddingBlock, 6px)
+      calc(var(--control-medium-paddingInline-condensed, 8px) + (var(--ghcm-depth, 0) * var(--ghcm-space-2)));
     cursor: pointer;
     text-align: left;
-    transition: background-color 120ms ease, opacity 120ms ease;
+    transition: background-color 33.333ms linear;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .ghcm-outline-link:hover {
-    background: var(--ghcm-surface-subtle);
+  @media (hover: hover) and (pointer: fine) {
+    .ghcm-root .ghcm-outline-link:hover {
+      background: var(--ghcm-hover);
+    }
   }
 
-  .ghcm-outline-link.is-active {
-    background: var(--ghcm-surface-accent);
-    box-shadow: inset 2px 0 var(--ghcm-accent);
+  .ghcm-root .ghcm-outline-link:active {
+    background: var(--ghcm-pressed);
+  }
+
+  .ghcm-outline-link.is-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 2px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--ghcm-accent);
+    transform: translateY(-50%);
+    pointer-events: none;
   }
 
   .ghcm-outline-link.is-muted {
@@ -78,9 +96,9 @@ export const outlineStyles = `
     display: block;
     min-width: 0;
     color: var(--ghcm-ink-soft);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 400;
-    line-height: 1.5;
+    line-height: 20px;
     overflow-wrap: anywhere;
   }
 

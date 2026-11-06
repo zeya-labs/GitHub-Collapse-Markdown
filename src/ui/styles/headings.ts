@@ -3,6 +3,8 @@ export const headingStyles = `
     position: relative;
     cursor: pointer;
     scroll-margin-top: 120px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .ghcm-heading-block--wrapped {
@@ -24,7 +26,7 @@ export const headingStyles = `
     width: 20px;
     height: 20px;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--borderRadius-medium, 6px);
     background: transparent;
     color: inherit;
     display: inline-flex;
@@ -37,6 +39,7 @@ export const headingStyles = `
     transition: opacity 140ms ease;
     margin: 0;
     padding: 0;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .ghcm-heading-toggle::before {
@@ -54,13 +57,23 @@ export const headingStyles = `
   }
 
   .ghcm-heading-toggle:focus-visible {
-    outline: 2px solid var(--fgColor-accent, var(--color-accent-fg, #0969da));
-    outline-offset: 2px;
+    outline: 2px solid var(--focus-outlineColor, var(--fgColor-accent, var(--color-accent-fg, #0969da)));
+    outline-offset: -2px;
   }
 
-  .ghcm-heading-block:hover .ghcm-heading-toggle,
   .ghcm-heading-toggle:focus-visible {
     opacity: 1;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ghcm-heading-block:hover .ghcm-heading-toggle {
+      opacity: 1;
+    }
+  }
+
+  .ghcm-heading-toggle:active {
+    opacity: 1;
+    background: var(--control-transparent-bgColor-active, var(--color-action-list-item-default-active-bg, rgba(129, 139, 152, 0.15)));
   }
 
   @media (pointer: coarse) {

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        GitHub Collapse Markdown
-// @version     5.2.1
+// @version     5.2.2
 // @description GitHub Markdown 标题折叠脚本，支持大纲、状态记忆与现代 GitHub 页面
 // @license     MIT
 // @author      Xyea
@@ -691,15 +691,15 @@
     color: var(--fgColor-default, var(--color-fg-default, inherit));
     --ghcm-space-1: var(--base-size-4, 4px);
     --ghcm-space-2: var(--base-size-8, 8px);
-    --ghcm-space-3: var(--base-size-12, 12px);
     --ghcm-space-4: var(--base-size-16, 16px);
     --ghcm-ink: var(--fgColor-default, var(--color-fg-default, currentColor));
     --ghcm-ink-soft: var(--fgColor-muted, var(--color-fg-muted, #59636e));
     --ghcm-ink-muted: var(--ghcm-ink-soft);
     --ghcm-line: var(--borderColor-default, var(--color-border-default, #d0d7de));
     --ghcm-surface: var(--bgColor-default, var(--color-canvas-default, #ffffff));
-    --ghcm-surface-subtle: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
-    --ghcm-surface-accent: var(--bgColor-accent-muted, var(--color-accent-subtle, rgba(9, 105, 218, 0.08)));
+    --ghcm-hover: var(--control-transparent-bgColor-hover, var(--color-action-list-item-default-hover-bg, rgba(129, 139, 152, 0.1)));
+    --ghcm-pressed: var(--control-transparent-bgColor-active, var(--color-action-list-item-default-active-bg, rgba(129, 139, 152, 0.15)));
+    --ghcm-radius: var(--borderRadius-medium, 6px);
     --ghcm-accent: var(--fgColor-accent, var(--color-accent-fg, #0969da));
   }
 
@@ -714,12 +714,13 @@
     font-family: inherit;
   }
 
-  .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
-    outline: 2px solid var(--ghcm-accent);
-    outline-offset: 2px;
+  .ghcm-root :is(button, summary) {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .ghcm-root .ghcm-outline-link:focus-visible {
+  .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
+    outline: 2px solid var(--focus-outlineColor, var(--ghcm-accent));
     outline-offset: -2px;
   }
 
@@ -762,6 +763,8 @@
     position: relative;
     cursor: pointer;
     scroll-margin-top: 120px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .ghcm-heading-block--wrapped {
@@ -783,7 +786,7 @@
     width: 20px;
     height: 20px;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--borderRadius-medium, 6px);
     background: transparent;
     color: inherit;
     display: inline-flex;
@@ -796,6 +799,7 @@
     transition: opacity 140ms ease;
     margin: 0;
     padding: 0;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .ghcm-heading-toggle::before {
@@ -813,13 +817,23 @@
   }
 
   .ghcm-heading-toggle:focus-visible {
-    outline: 2px solid var(--fgColor-accent, var(--color-accent-fg, #0969da));
-    outline-offset: 2px;
+    outline: 2px solid var(--focus-outlineColor, var(--fgColor-accent, var(--color-accent-fg, #0969da)));
+    outline-offset: -2px;
   }
 
-  .ghcm-heading-block:hover .ghcm-heading-toggle,
   .ghcm-heading-toggle:focus-visible {
     opacity: 1;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ghcm-heading-block:hover .ghcm-heading-toggle {
+      opacity: 1;
+    }
+  }
+
+  .ghcm-heading-toggle:active {
+    opacity: 1;
+    background: var(--control-transparent-bgColor-active, var(--color-action-list-item-default-active-bg, rgba(129, 139, 152, 0.15)));
   }
 
   @media (pointer: coarse) {
@@ -889,31 +903,49 @@
     color: var(--ghcm-ink-muted);
   }
 
-  .ghcm-outline-link {
+  .ghcm-root .ghcm-outline-link {
     appearance: none;
     display: flex;
+    position: relative;
     flex-shrink: 0;
     align-items: center;
     width: 100%;
-    min-height: 28px;
+    min-height: var(--control-medium-size, 32px);
     border: none;
     background: transparent;
-    border-radius: 4px;
+    border-radius: var(--ghcm-radius, 6px);
     margin: 0;
-    padding: var(--ghcm-space-1) var(--ghcm-space-2) var(--ghcm-space-1)
-      calc(var(--ghcm-space-2) + (var(--ghcm-depth, 0) * var(--ghcm-space-3)));
+    padding: var(--control-medium-paddingBlock, 6px) var(--control-medium-paddingInline-condensed, 8px)
+      var(--control-medium-paddingBlock, 6px)
+      calc(var(--control-medium-paddingInline-condensed, 8px) + (var(--ghcm-depth, 0) * var(--ghcm-space-2)));
     cursor: pointer;
     text-align: left;
-    transition: background-color 120ms ease, opacity 120ms ease;
+    transition: background-color 33.333ms linear;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .ghcm-outline-link:hover {
-    background: var(--ghcm-surface-subtle);
+  @media (hover: hover) and (pointer: fine) {
+    .ghcm-root .ghcm-outline-link:hover {
+      background: var(--ghcm-hover);
+    }
   }
 
-  .ghcm-outline-link.is-active {
-    background: var(--ghcm-surface-accent);
-    box-shadow: inset 2px 0 var(--ghcm-accent);
+  .ghcm-root .ghcm-outline-link:active {
+    background: var(--ghcm-pressed);
+  }
+
+  .ghcm-outline-link.is-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 2px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--ghcm-accent);
+    transform: translateY(-50%);
+    pointer-events: none;
   }
 
   .ghcm-outline-link.is-muted {
@@ -924,9 +956,9 @@
     display: block;
     min-width: 0;
     color: var(--ghcm-ink-soft);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 400;
-    line-height: 1.5;
+    line-height: 20px;
     overflow-wrap: anywhere;
   }
 
@@ -957,15 +989,15 @@
     gap: var(--ghcm-space-1);
     margin: 0;
     border: 0;
-    border-radius: 4px;
-    padding: var(--ghcm-space-1) 0;
+    border-radius: var(--ghcm-radius);
+    padding: var(--control-small-paddingBlock, 4px) var(--control-medium-paddingInline-condensed, 8px);
     background: transparent;
     color: var(--ghcm-ink-soft);
     font-size: 14px;
     font-weight: 600;
     line-height: 20px;
     cursor: pointer;
-    transition: color 120ms ease;
+    transition: background-color 33.333ms linear;
   }
 
   .ghcm-trigger::before {
@@ -975,10 +1007,6 @@
     border-right: 1.5px solid currentColor;
     border-bottom: 1.5px solid currentColor;
     transform: rotate(-45deg);
-  }
-
-  .ghcm-trigger:hover {
-    color: var(--ghcm-accent);
   }
 
   .ghcm-trigger.is-hidden {
@@ -1010,7 +1038,6 @@
     right: var(--ghcm-space-4);
     z-index: 2147483644;
     border: 1px solid var(--ghcm-line);
-    padding: var(--ghcm-space-1) var(--ghcm-space-2);
     background: var(--ghcm-surface);
   }
 
@@ -1024,7 +1051,7 @@
     max-height: min(560px, calc(100dvh - 16px));
     z-index: 2147483644;
     border: 1px solid var(--ghcm-line);
-    border-radius: 6px;
+    border-radius: var(--ghcm-radius);
     background: var(--ghcm-surface);
     box-shadow: var(--shadow-floating-small, 0 4px 12px rgba(31, 35, 40, 0.12));
   }
@@ -1095,15 +1122,15 @@
     appearance: none;
     margin: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--ghcm-radius);
     padding: 0;
     background: transparent;
     color: var(--ghcm-ink);
     font: inherit;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 20px;
     cursor: pointer;
-    transition: background-color 120ms ease;
+    transition: background-color 33.333ms linear;
   }
 
   .ghcm-root .ghcm-actions {
@@ -1117,16 +1144,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: var(--control-small-size, 28px);
+    height: var(--control-small-size, 28px);
     margin: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--ghcm-radius);
     padding: 0;
     background: transparent;
     color: var(--ghcm-ink-soft);
     cursor: pointer;
     list-style: none;
+    transition: background-color 33.333ms linear;
   }
 
   .ghcm-actions-trigger::-webkit-details-marker {
@@ -1140,11 +1168,14 @@
     pointer-events: none;
   }
 
-  .ghcm-actions-trigger:hover,
-  .ghcm-close-action:hover,
-  .ghcm-actions[open] > .ghcm-actions-trigger,
-  .ghcm-inline-action:hover {
-    background: var(--ghcm-surface-subtle);
+  @media (hover: hover) and (pointer: fine) {
+    .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action):hover {
+      background-color: var(--ghcm-hover);
+    }
+  }
+
+  .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action):active {
+    background-color: var(--ghcm-pressed);
   }
 
   .ghcm-actions-menu {
@@ -1158,7 +1189,7 @@
     min-width: 160px;
     margin: 0;
     border: 1px solid var(--ghcm-line);
-    border-radius: 6px;
+    border-radius: var(--ghcm-radius);
     padding: var(--ghcm-space-1);
     background: var(--ghcm-surface);
     box-shadow: var(--shadow-floating-small, 0 4px 12px rgba(31, 35, 40, 0.12));
@@ -1171,7 +1202,8 @@
 
   .ghcm-actions-menu .ghcm-inline-action {
     width: 100%;
-    padding: var(--ghcm-space-1) var(--ghcm-space-2);
+    min-height: var(--control-medium-size, 32px);
+    padding: var(--control-medium-paddingBlock, 6px) var(--control-medium-paddingInline-condensed, 8px);
     text-align: left;
     white-space: nowrap;
   }
@@ -1179,15 +1211,11 @@
   .ghcm-root.is-overlay .ghcm-outline {
     margin: var(--ghcm-space-2);
   }
-
-  .ghcm-actions-menu .ghcm-inline-action:focus-visible {
-    outline-offset: -2px;
-  }
 `;
 
   // src/ui/styles/responsive.ts
   var responsiveStyles = `
-  @media (max-width: 1179px), (pointer: coarse) {
+  @media (pointer: coarse) {
     .ghcm-root .ghcm-trigger,
     .ghcm-root .ghcm-actions-trigger,
     .ghcm-root .ghcm-close-action,
@@ -1286,6 +1314,9 @@
     }
     getActiveHeadingKey() {
       return this.activeHeadingKey;
+    }
+    invalidateLayout() {
+      this.positionsDirty = true;
     }
     setActiveHeadingKey(activeHeadingKey, force = false) {
       if (!force && activeHeadingKey === this.activeHeadingKey) {
@@ -2253,6 +2284,7 @@
       __publicField(this, "mounted", false);
       __publicField(this, "desktop", false);
       __publicField(this, "open", false);
+      __publicField(this, "layoutChangeRaf", 0);
       this.layout = new PanelLayout(
         {
           dockRow: this.dom.dockRow,
@@ -2281,6 +2313,7 @@
     }
     destroy() {
       this.abortController.abort();
+      window.cancelAnimationFrame(this.layoutChangeRaf);
       this.focus.destroy();
       this.actions.destroy();
       this.drag.destroy();
@@ -2308,6 +2341,7 @@
       }
       if (structureChanged) {
         this.layout.refreshGeometry();
+        this.scheduleLayoutChange();
       }
     }
     bindEvents() {
@@ -2349,16 +2383,21 @@
       this.sync({ resetOpen: force });
     }
     applyOpenState(open) {
+      const changed = open !== this.open;
       const becameOpen = open && !this.open;
       this.open = open;
       this.sync({ moveFocus: true });
       if (becameOpen) {
         this.outlineView.scheduleActiveItemVisibility(true);
       }
+      if (changed) {
+        this.scheduleLayoutChange();
+      }
     }
     sync({ resetOpen = false, moveFocus = false } = {}) {
       const previousFocus = document.activeElement;
       const previousPlacement = this.layout.getPlacement();
+      const previousOpen = this.open;
       this.layout.sync(this.desktop, this.open);
       const placement = this.layout.getPlacement();
       if (resetOpen || placement !== previousPlacement) {
@@ -2371,6 +2410,19 @@
       updatePanelDom(this.dom, placement, this.open);
       this.focus.sync({ open: this.open, moveFocus, previousFocus });
       this.drag.sync(placement === "overlay" && this.open);
+      if (placement !== previousPlacement || this.open !== previousOpen) {
+        this.scheduleLayoutChange();
+      }
+    }
+    scheduleLayoutChange() {
+      if (!this.options.onLayoutChange) {
+        return;
+      }
+      window.cancelAnimationFrame(this.layoutChangeRaf);
+      this.layoutChangeRaf = window.requestAnimationFrame(() => {
+        this.layoutChangeRaf = 0;
+        this.options.onLayoutChange?.();
+      });
     }
   };
 
@@ -2391,6 +2443,7 @@
         onCollapseAll: this.options.onCollapseAll,
         onExpandAll: this.options.onExpandAll,
         onJump: (key) => this.jumpToHeading(key),
+        onLayoutChange: () => this.refreshActiveHeading(),
         resolveDockedLayout: () => this.options.adapter.getDockedPanelLayout?.(document) ?? null,
         resolveInlineHost: () => this.options.document.getContainerElements().find(isUsablePanelHost) ?? null
       });
@@ -2449,6 +2502,12 @@
         ...patch
       };
       this.panel.render(this.panelState);
+    }
+    refreshActiveHeading() {
+      this.activeHeading.invalidateLayout();
+      if (this.activeHeading.sync(this.panelState.headings)) {
+        this.updatePanelState({ activeHeadingKey: this.activeHeading.getActiveHeadingKey() });
+      }
     }
   };
 

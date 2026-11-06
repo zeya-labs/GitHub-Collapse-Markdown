@@ -6,15 +6,15 @@ export const panelStyles = `
     gap: var(--ghcm-space-1);
     margin: 0;
     border: 0;
-    border-radius: 4px;
-    padding: var(--ghcm-space-1) 0;
+    border-radius: var(--ghcm-radius);
+    padding: var(--control-small-paddingBlock, 4px) var(--control-medium-paddingInline-condensed, 8px);
     background: transparent;
     color: var(--ghcm-ink-soft);
     font-size: 14px;
     font-weight: 600;
     line-height: 20px;
     cursor: pointer;
-    transition: color 120ms ease;
+    transition: background-color 33.333ms linear;
   }
 
   .ghcm-trigger::before {
@@ -24,10 +24,6 @@ export const panelStyles = `
     border-right: 1.5px solid currentColor;
     border-bottom: 1.5px solid currentColor;
     transform: rotate(-45deg);
-  }
-
-  .ghcm-trigger:hover {
-    color: var(--ghcm-accent);
   }
 
   .ghcm-trigger.is-hidden {
@@ -59,7 +55,6 @@ export const panelStyles = `
     right: var(--ghcm-space-4);
     z-index: 2147483644;
     border: 1px solid var(--ghcm-line);
-    padding: var(--ghcm-space-1) var(--ghcm-space-2);
     background: var(--ghcm-surface);
   }
 
@@ -73,7 +68,7 @@ export const panelStyles = `
     max-height: min(560px, calc(100dvh - 16px));
     z-index: 2147483644;
     border: 1px solid var(--ghcm-line);
-    border-radius: 6px;
+    border-radius: var(--ghcm-radius);
     background: var(--ghcm-surface);
     box-shadow: var(--shadow-floating-small, 0 4px 12px rgba(31, 35, 40, 0.12));
   }
@@ -144,15 +139,15 @@ export const panelStyles = `
     appearance: none;
     margin: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--ghcm-radius);
     padding: 0;
     background: transparent;
     color: var(--ghcm-ink);
     font: inherit;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 20px;
     cursor: pointer;
-    transition: background-color 120ms ease;
+    transition: background-color 33.333ms linear;
   }
 
   .ghcm-root .ghcm-actions {
@@ -166,16 +161,17 @@ export const panelStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: var(--control-small-size, 28px);
+    height: var(--control-small-size, 28px);
     margin: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--ghcm-radius);
     padding: 0;
     background: transparent;
     color: var(--ghcm-ink-soft);
     cursor: pointer;
     list-style: none;
+    transition: background-color 33.333ms linear;
   }
 
   .ghcm-actions-trigger::-webkit-details-marker {
@@ -189,11 +185,14 @@ export const panelStyles = `
     pointer-events: none;
   }
 
-  .ghcm-actions-trigger:hover,
-  .ghcm-close-action:hover,
-  .ghcm-actions[open] > .ghcm-actions-trigger,
-  .ghcm-inline-action:hover {
-    background: var(--ghcm-surface-subtle);
+  @media (hover: hover) and (pointer: fine) {
+    .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action):hover {
+      background-color: var(--ghcm-hover);
+    }
+  }
+
+  .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action):active {
+    background-color: var(--ghcm-pressed);
   }
 
   .ghcm-actions-menu {
@@ -207,7 +206,7 @@ export const panelStyles = `
     min-width: 160px;
     margin: 0;
     border: 1px solid var(--ghcm-line);
-    border-radius: 6px;
+    border-radius: var(--ghcm-radius);
     padding: var(--ghcm-space-1);
     background: var(--ghcm-surface);
     box-shadow: var(--shadow-floating-small, 0 4px 12px rgba(31, 35, 40, 0.12));
@@ -220,16 +219,13 @@ export const panelStyles = `
 
   .ghcm-actions-menu .ghcm-inline-action {
     width: 100%;
-    padding: var(--ghcm-space-1) var(--ghcm-space-2);
+    min-height: var(--control-medium-size, 32px);
+    padding: var(--control-medium-paddingBlock, 6px) var(--control-medium-paddingInline-condensed, 8px);
     text-align: left;
     white-space: nowrap;
   }
 
   .ghcm-root.is-overlay .ghcm-outline {
     margin: var(--ghcm-space-2);
-  }
-
-  .ghcm-actions-menu .ghcm-inline-action:focus-visible {
-    outline-offset: -2px;
   }
 `;
