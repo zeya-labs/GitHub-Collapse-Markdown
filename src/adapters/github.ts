@@ -165,7 +165,7 @@ export const githubAdapter: SiteAdapter = {
       return true;
     }
 
-    return isDockVisibilityMutation(mutation);
+    return shouldRefreshForSidebarMutation(mutation);
   },
   getStickyHeaderOffset(document) {
     const sticky = document.querySelector<HTMLElement>(STICKY_HEADER_SELECTOR);
@@ -209,13 +209,27 @@ function resolveGitHubDockHost(document: Document): HTMLElement | null {
   return null;
 }
 
-function isDockVisibilityMutation(mutation: MutationRecord): boolean {
+function shouldRefreshForSidebarMutation(mutation: MutationRecord): boolean {
   const target = mutation.target instanceof HTMLElement ? mutation.target : null;
-  if (mutation.type !== "attributes" || !target || isManagedNode(target) || target.closest(".ghcm-root, .ghcm-dock-row")) {
+  if (!target || isManagedNode(target) || target.closest(".ghcm-root, .ghcm-dock-row")) {
     return false;
   }
 
-  return target.matches(GITHUB_SIDEBAR_SELECTOR) || Boolean(target.querySelector(GITHUB_SIDEBAR_SELECTOR));
+  if (mutation.type === "attributes") {
+    return target.matches(GITHUB_SIDEBAR_SELECTOR) || Boolean(target.querySelector(GITHUB_SIDEBAR_SELECTOR));
+  }
+
+  if (mutation.type !== "childList") {
+    return false;
+  }
+
+  const nativeElements = [...mutation.addedNodes, ...mutation.removedNodes]
+    .filter((node): node is HTMLElement => node instanceof HTMLElement && !isManagedNode(node));
+
+  // GitHub can hydrate or replace metadata after the Markdown is already mounted.
+  return nativeElements.some((element) =>
+    element.matches(GITHUB_SIDEBAR_SELECTOR) || Boolean(element.querySelector(GITHUB_SIDEBAR_SELECTOR))
+  ) || (nativeElements.length > 0 && Boolean(target.closest(GITHUB_SIDEBAR_SELECTOR)));
 }
 
 function resolveGitHubDockBoundary(host: HTMLElement): HTMLElement | null {

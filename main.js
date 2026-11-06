@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        GitHub Collapse Markdown
-// @version     5.2.3
+// @version     5.2.4
 // @description GitHub Markdown 标题折叠脚本，支持大纲、状态记忆与现代 GitHub 页面
 // @license     MIT
 // @author      Xyea
@@ -427,7 +427,7 @@
       if (shouldRefreshForContentMutation(mutation, GITHUB_CONTENT_ROOT_SELECTOR)) {
         return true;
       }
-      return isDockVisibilityMutation(mutation);
+      return shouldRefreshForSidebarMutation(mutation);
     },
     getStickyHeaderOffset(document2) {
       const sticky = document2.querySelector(STICKY_HEADER_SELECTOR);
@@ -465,12 +465,21 @@
     }
     return null;
   }
-  function isDockVisibilityMutation(mutation) {
+  function shouldRefreshForSidebarMutation(mutation) {
     const target = mutation.target instanceof HTMLElement ? mutation.target : null;
-    if (mutation.type !== "attributes" || !target || isManagedNode(target) || target.closest(".ghcm-root, .ghcm-dock-row")) {
+    if (!target || isManagedNode(target) || target.closest(".ghcm-root, .ghcm-dock-row")) {
       return false;
     }
-    return target.matches(GITHUB_SIDEBAR_SELECTOR) || Boolean(target.querySelector(GITHUB_SIDEBAR_SELECTOR));
+    if (mutation.type === "attributes") {
+      return target.matches(GITHUB_SIDEBAR_SELECTOR) || Boolean(target.querySelector(GITHUB_SIDEBAR_SELECTOR));
+    }
+    if (mutation.type !== "childList") {
+      return false;
+    }
+    const nativeElements = [...mutation.addedNodes, ...mutation.removedNodes].filter((node) => node instanceof HTMLElement && !isManagedNode(node));
+    return nativeElements.some(
+      (element) => element.matches(GITHUB_SIDEBAR_SELECTOR) || Boolean(element.querySelector(GITHUB_SIDEBAR_SELECTOR))
+    ) || nativeElements.length > 0 && Boolean(target.closest(GITHUB_SIDEBAR_SELECTOR));
   }
   function resolveGitHubDockBoundary(host) {
     const sidebar = resolveSidebarOwner(host);

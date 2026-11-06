@@ -1,6 +1,6 @@
 # GitHub Collapse Markdown
 
-![Version](https://img.shields.io/badge/version-5.2.3-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-5.2.4-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Userscript](https://img.shields.io/badge/userscript-Tampermonkey%2FViolentmonkey-orange.svg)
 
@@ -40,7 +40,7 @@ GitHub 上的长文档通常有这些问题：
 - 页面记忆
   会记住当前页面的折叠状态，下次回来继续看
 - 动态页面兼容
-  GitHub 内部跳转、局部刷新、评论区更新后会自动重新挂载
+  GitHub 内部跳转、局部刷新、评论区更新后会自动重新挂载；侧栏延迟加载或被替换时，目录也会自动重新选择位置
 
 ## 支持页面
 
@@ -87,6 +87,7 @@ GitHub 上的长文档通常有这些问题：
      [`main.js` 原始链接](https://raw.githubusercontent.com/zeya-labs/GitHub-Collapse-Markdown/main/main.js)
    - 或使用构建产物：
      `dist/github-collapse-markdown.user.js`
+3. 更新后刷新 GitHub 页面，让新脚本生效；已安装的版本以脚本管理器显示为准
 
 ## 适合谁
 

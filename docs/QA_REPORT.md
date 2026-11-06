@@ -6,9 +6,12 @@
 
 ## Latest fixes and validation
 
-- Version 5.2.3: `npm run verify` passes the TypeScript check, 165 automated tests, and userscript build. Both userscript outputs match.
+- Version 5.2.4: `npm run verify` passes the TypeScript check, 170 automated tests, and userscript build. Both userscript outputs match.
+- Fixed a lifecycle gap that left contents above the README when metadata arrived after initial mounting. Native sidebar insertion, hydration, replacement, removal, and metadata added outside the original grid now trigger placement resolution. Script-owned outline updates and moves remain excluded from refresh filtering.
+- Five new integration regressions fail against 5.2.3 and pass with the fix, without resize events, Markdown edits, or navigation events. The existing panel and heading controls are retained for insertion, hydration, and host promotion; removed/replaced sidebars recover one usable outline automatically.
+- A Chromium before/after run uses the downloaded `zeya-labs/GitHub-Collapse-Markdown` README and complete metadata pane with local Primer CSS and layout shims. The same 22 checks pass 12/22 on 5.2.3 and 22/22 on 5.2.4. All five lifecycle failures are reproduced before the fix and recover afterward without resizing; the outline follows scrolling after migration. Screenshots and video capture the delayed-sidebar transition. The complete downloaded HTML also serves as a static host-discovery control, without claiming its blocked external styling was rendered faithfully.
 - The repository outline belongs after all native sidebar metadata, including About, Releases, and Languages. It starts in normal document flow, follows reading after reaching the sticky offset, and avoids the reading-region end. This is core behavior, not an optional layout enhancement.
-- 25 Chromium checks pass against the actual built userscript with a downloaded modern GitHub metadata pane and Node.js README, local Primer CSS, and modern/table layout fixtures. Coverage includes metadata order, normal scrolling before pinning, following beyond a short sidebar's bottom, internal outline scrolling, footer avoidance, return to normal flow, late metadata, visible sidebars at 1000px, hidden-sidebar fallback, and legacy sidebar following. The scroll sequence was also recorded.
+- All 25 Chromium sidebar-flow checks also pass again on 5.2.4 against the built userscript with a downloaded modern GitHub metadata pane and Node.js README, local Primer CSS, and modern/table layout fixtures. Coverage includes metadata order, normal scrolling before pinning, following beyond a short sidebar's bottom, internal outline scrolling, footer avoidance, return to normal flow, late metadata, visible sidebars at 1000px, hidden-sidebar fallback, and legacy sidebar following. The scroll sequence was also recorded.
 - Modern `SplitPageLayout.Pane` metadata hosts and older sidebar grids are both supported. The complete metadata owner is used when native sections have sibling containers. Navigation panes are excluded, late native sections remain before the outline, and the reading region supplies the follow boundary instead of the short metadata pane.
 - Sidebar visibility determines placement; there is no fixed viewport-width gate. Flow height remains stable when the outline initially starts below the viewport, and content measurement preserves internal scrolling for long outlines.
 - Earlier 5.2.2 validation passed 40 Chromium layout checks, 23 focused interaction checks, and 18 floating-window checks with official Primer CSS and native fixtures. GitHub static assets are blocked by the environment, so these local reproductions do not establish full live-site or userscript-manager compatibility.
@@ -91,6 +94,8 @@ Using the previous tracked `README.md` as the baseline, the requirements split i
 
 - `tests/app.integration.test.ts`
   - App mounts on a realistic GitHub markdown page
+  - Late sidebar insertion and metadata hydration move existing inline contents into the sidebar without resizing
+  - Sidebar replacement/removal restores one usable outline, and later native siblings remain before contents
   - Clicking headings collapses sections
   - Clicking native anchor icons does not collapse
   - Panel actions work

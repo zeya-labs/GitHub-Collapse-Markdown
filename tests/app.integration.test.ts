@@ -178,6 +178,103 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     expect(document.querySelectorAll(".ghcm-dock-row")).toHaveLength(1);
   });
 
+  it("moves existing inline contents into a native sidebar inserted after mounting", async () => {
+    document.body.innerHTML = githubReadmePageFixture;
+    const sidebar = document.querySelector<HTMLElement>(".prc-PageLayout-PaneWrapper-pHPop")!;
+    const readingRegion = sidebar.parentElement!;
+    sidebar.remove();
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+    const root = document.querySelector<HTMLElement>(".ghcm-root")!;
+    const headingControl = document.querySelector(".ghcm-heading-toggle");
+    expect(root.classList.contains("is-inline")).toBe(true);
+
+    readingRegion.append(sidebar);
+    await sleep(180);
+
+    expect(root.classList.contains("is-docked")).toBe(true);
+    expect(root.closest(".ghcm-dock-row")?.parentElement).toBe(sidebar.querySelector(".BorderGrid"));
+    expect(document.querySelector(".ghcm-root")).toBe(root);
+    expect(document.querySelector(".ghcm-heading-toggle")).toBe(headingControl);
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+    expect(document.querySelector(".markdown-body > .ghcm-root")).toBeNull();
+  });
+
+  it("uses an existing modern sidebar when its metadata is hydrated after mounting", async () => {
+    document.body.innerHTML = githubReadmePageFixture;
+    const sidebar = document.querySelector<HTMLElement>(".prc-PageLayout-Pane-AyzHK")!;
+    sidebar.replaceChildren();
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+    const root = document.querySelector<HTMLElement>(".ghcm-root")!;
+    const headingControl = document.querySelector(".ghcm-heading-toggle");
+    expect(root.classList.contains("is-inline")).toBe(true);
+
+    sidebar.innerHTML = '<div class="borderGrid__hydrated"><section><h2>About</h2></section><section><h2>Languages</h2></section></div>';
+    await sleep(180);
+
+    expect(root.classList.contains("is-docked")).toBe(true);
+    expect(sidebar.lastElementChild).toBe(root.closest(".ghcm-dock-row"));
+    expect(document.querySelector(".ghcm-root")).toBe(root);
+    expect(document.querySelector(".ghcm-heading-toggle")).toBe(headingControl);
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+  });
+
+  it.each(["replace", "remove"] as const)("recovers contents when the native sidebar is %sd", async (change) => {
+    document.body.innerHTML = githubReadmePageFixture;
+    const sidebar = document.querySelector<HTMLElement>(".prc-PageLayout-PaneWrapper-pHPop")!;
+    const replacement = sidebar.cloneNode(true) as HTMLElement;
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+    expect(document.querySelector(".ghcm-root")?.classList.contains("is-docked")).toBe(true);
+
+    if (change === "replace") {
+      sidebar.replaceWith(replacement);
+    } else {
+      sidebar.remove();
+    }
+    await sleep(180);
+
+    const root = document.querySelector<HTMLElement>(".ghcm-root");
+    expect(root).not.toBeNull();
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(6);
+    if (change === "replace") {
+      expect(root?.classList.contains("is-docked")).toBe(true);
+      expect(replacement.contains(root)).toBe(true);
+      expect(replacement.querySelector(".BorderGrid")?.lastElementChild).toBe(root?.closest(".ghcm-dock-row"));
+    } else {
+      expect(root?.classList.contains("is-inline")).toBe(true);
+      expect(document.querySelector(".markdown-body")?.firstElementChild).toBe(root);
+      expect(document.querySelector(".ghcm-dock-row")).toBeNull();
+    }
+  });
+
+  it("moves contents after metadata added outside its original native grid", async () => {
+    document.body.innerHTML = githubReadmePageFixture;
+    const sidebar = document.querySelector<HTMLElement>(".prc-PageLayout-Pane-AyzHK")!;
+    const nativeGrid = sidebar.querySelector<HTMLElement>(".BorderGrid")!;
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+    const root = document.querySelector<HTMLElement>(".ghcm-root")!;
+    const row = root.closest(".ghcm-dock-row");
+    const headingControl = document.querySelector(".ghcm-heading-toggle");
+    expect(row?.parentElement).toBe(nativeGrid);
+
+    const languages = document.createElement("section");
+    languages.innerHTML = "<h2>Languages</h2><p>TypeScript</p>";
+    sidebar.append(languages);
+    await sleep(180);
+
+    expect(row?.parentElement).toBe(sidebar);
+    expect(sidebar.lastElementChild).toBe(row);
+    expect(row?.previousElementSibling).toBe(languages);
+    expect(sidebar.contains(nativeGrid)).toBe(true);
+    expect(document.querySelector(".ghcm-root")).toBe(root);
+    expect(document.querySelector(".ghcm-heading-toggle")).toBe(headingControl);
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+  });
+
   it("uses the complete reading layout bottom instead of the short metadata pane", () => {
     document.body.innerHTML = githubReadmePageFixture;
     Object.defineProperty(document.querySelector("header[role='banner']"), "offsetHeight", {
