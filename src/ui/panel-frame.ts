@@ -4,6 +4,7 @@ export interface DockedPanelMeasureElements {
   dockRow: HTMLElement;
   dockCell: HTMLElement;
   panel: HTMLElement;
+  outline?: HTMLElement;
 }
 
 export interface DockedPanelFrameElements {
@@ -32,14 +33,55 @@ export interface DockedPanelFrame {
 const DOCKED_PANEL_BOUNDARY_BOTTOM_GAP = 30;
 const DOCKED_PANEL_VIEWPORT_BOTTOM_GAP = 16;
 
+function stylePixels(style: CSSStyleDeclaration, property: string): number {
+  return Number.parseFloat(style.getPropertyValue(property)) || 0;
+}
+
+function verticalMargins(element: HTMLElement): number {
+  const style = window.getComputedStyle(element);
+  return stylePixels(style, "margin-top") + stylePixels(style, "margin-bottom");
+}
+
+function measureOutlineContentHeight(outline: HTMLElement): number {
+  const style = window.getComputedStyle(outline);
+  const lastChild = outline.lastElementChild;
+  if (lastChild instanceof HTMLElement) {
+    const contentBottom = lastChild.getBoundingClientRect().bottom - outline.getBoundingClientRect().top + outline.scrollTop;
+    if (contentBottom > 0) {
+      // A flexed navigation viewport can be taller or shorter than its contents.
+      return contentBottom + stylePixels(window.getComputedStyle(lastChild), "margin-bottom") +
+        stylePixels(style, "padding-bottom") + stylePixels(style, "border-bottom-width");
+    }
+  }
+
+  return outline.scrollHeight + stylePixels(style, "border-top-width") + stylePixels(style, "border-bottom-width");
+}
+
+function measureNaturalPanelHeight({ panel, outline }: DockedPanelMeasureElements): number {
+  const fallback = Math.max(panel.scrollHeight, panel.offsetHeight, 0);
+  if (!outline || outline.parentElement !== panel) {
+    return fallback;
+  }
+
+  const style = window.getComputedStyle(panel);
+  const children = Array.from(panel.children).filter((child): child is HTMLElement => child instanceof HTMLElement);
+  const contentHeight = children.reduce((height, child) => height + verticalMargins(child) +
+    (child === outline ? measureOutlineContentHeight(outline) : child.offsetHeight), 0);
+  const naturalHeight = contentHeight +
+    stylePixels(style, "padding-top") + stylePixels(style, "padding-bottom") +
+    stylePixels(style, "border-top-width") + stylePixels(style, "border-bottom-width") +
+    stylePixels(style, "row-gap") * Math.max(children.length - 1, 0);
+
+  return naturalHeight > 0 ? naturalHeight : fallback;
+}
+
 export function measureDockedPanel(
   elements: DockedPanelMeasureElements,
   context: DockedPanelLayoutContext
 ): DockedPanelMeasurement {
-  const rowRect = elements.dockRow.getBoundingClientRect();
   const cellRect = elements.dockCell.getBoundingClientRect();
   const cellStyle = window.getComputedStyle(elements.dockCell);
-  const inset = (property: string) => Number.parseFloat(cellStyle.getPropertyValue(property)) || 0;
+  const inset = (property: string) => stylePixels(cellStyle, property);
   const leftInset = inset("padding-left") + inset("border-left-width");
   const rightInset = inset("padding-right") + inset("border-right-width");
   const topInset = inset("padding-top") + inset("border-top-width");
@@ -51,8 +93,8 @@ export function measureDockedPanel(
       : Number.POSITIVE_INFINITY,
     cellLeft: Math.max(cellRect.left + leftInset, 0),
     cellWidth: Math.max(cellRect.width - leftInset - rightInset, 0),
-    naturalPanelHeight: Math.max(elements.panel.scrollHeight, elements.panel.offsetHeight, 0),
-    rowViewportTop: rowRect.top + topInset
+    naturalPanelHeight: measureNaturalPanelHeight(elements),
+    rowViewportTop: cellRect.top + topInset
   };
 }
 
@@ -62,25 +104,21 @@ export function computeDockedPanelFrame(
   viewportHeight: number
 ): DockedPanelFrame {
   const viewportBottom = viewportHeight - DOCKED_PANEL_VIEWPORT_BOTTOM_GAP;
-  const rowBoundedMaxHeight = Math.max(
-    Math.min(viewportBottom - measurement.rowViewportTop, measurement.boundaryViewportBottom - measurement.rowViewportTop),
-    0
-  );
-  const rowHeight = Math.max(Math.min(Math.ceil(measurement.naturalPanelHeight), Math.ceil(rowBoundedMaxHeight)), 0);
+  const viewportMaxHeight = Math.max(viewportBottom - topOffset, 0);
+  const preferredHeight = Math.min(measurement.naturalPanelHeight, viewportMaxHeight);
 
   if (measurement.rowViewportTop > topOffset) {
     return {
       mode: "flow",
       panelLeft: measurement.cellLeft,
-      panelHeight: rowHeight,
-      panelMaxHeight: rowBoundedMaxHeight,
+      panelHeight: Math.max(Math.ceil(preferredHeight), 0),
+      panelMaxHeight: viewportMaxHeight,
       panelTop: measurement.rowViewportTop,
       panelWidth: measurement.cellWidth,
       rowHeight: 0
     };
   }
 
-  const preferredHeight = Math.min(measurement.naturalPanelHeight, Math.max(viewportBottom - topOffset, 0));
   let panelTop = topOffset;
 
   if (measurement.boundaryViewportBottom < panelTop + preferredHeight) {
@@ -103,10 +141,10 @@ export function computeDockedPanelFrame(
 
 export function applyDockedPanelFrame(elements: DockedPanelFrameElements, frame: DockedPanelFrame): void {
   elements.root.classList.toggle("is-floating", frame.mode === "fixed");
+  elements.root.style.setProperty("--ghcm-panel-height", `${frame.panelHeight}px`);
+  elements.root.style.setProperty("--ghcm-panel-max-height", `${frame.panelMaxHeight}px`);
 
   if (frame.mode === "fixed") {
-    elements.root.style.setProperty("--ghcm-panel-height", `${frame.panelHeight}px`);
-    elements.root.style.setProperty("--ghcm-panel-max-height", `${frame.panelMaxHeight}px`);
     elements.root.style.setProperty("--ghcm-panel-left", `${frame.panelLeft}px`);
     elements.root.style.setProperty("--ghcm-panel-top", `${frame.panelTop}px`);
     elements.root.style.setProperty("--ghcm-panel-width", `${frame.panelWidth}px`);
@@ -115,8 +153,6 @@ export function applyDockedPanelFrame(elements: DockedPanelFrameElements, frame:
     return;
   }
 
-  elements.root.style.removeProperty("--ghcm-panel-height");
-  elements.root.style.removeProperty("--ghcm-panel-max-height");
   elements.root.style.removeProperty("--ghcm-panel-left");
   elements.root.style.removeProperty("--ghcm-panel-top");
   elements.root.style.removeProperty("--ghcm-panel-width");

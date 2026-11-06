@@ -1,7 +1,10 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isUsablePanelHost, resolvePanelPlacement } from "../src/ui/panel-placement";
 
-afterEach(() => document.body.replaceChildren());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  document.body.replaceChildren();
+});
 
 function mountHost(markup = '<article id="content"></article>'): HTMLElement {
   document.body.innerHTML = markup;
@@ -9,26 +12,26 @@ function mountHost(markup = '<article id="content"></article>'): HTMLElement {
 }
 
 describe("contextual panel placement", () => {
-  it("uses an available sidebar on desktop before an inline host", () => {
+  it.each([390, 1024, 1440])("prefers a visible native sidebar at a viewport width of %i", (viewportWidth) => {
+    vi.stubGlobal("innerWidth", viewportWidth);
     const inline = mountHost('<main id="content"></main><aside id="sidebar"></aside>');
     const host = document.getElementById("sidebar")!;
     const context = { host, topOffset: 80 };
-    expect(resolvePanelPlacement(true, {
+    expect(resolvePanelPlacement({
       resolveDockedLayout: () => context, resolveInlineHost: () => inline
     })).toEqual({ kind: "docked", context });
   });
 
-  it("embeds into the document on narrow screens instead of forcing a popup", () => {
-    const host = mountHost('<article id="content"></article><aside id="sidebar"></aside>');
-    expect(resolvePanelPlacement(false, {
-      resolveDockedLayout: () => ({ host: document.getElementById("sidebar")!, topOffset: 80 }),
-      resolveInlineHost: () => host
+  it("embeds into the document when there is no native sidebar", () => {
+    const host = mountHost();
+    expect(resolvePanelPlacement({
+      resolveDockedLayout: () => null, resolveInlineHost: () => host
     })).toEqual({ kind: "inline", host });
   });
 
   it("falls back from an unavailable sidebar to the visible document", () => {
     const host = mountHost('<article id="content"></article><aside id="sidebar" hidden></aside>');
-    expect(resolvePanelPlacement(true, {
+    expect(resolvePanelPlacement({
       resolveDockedLayout: () => ({ host: document.getElementById("sidebar")!, topOffset: 80 }),
       resolveInlineHost: () => host
     })).toEqual({ kind: "inline", host });
@@ -47,7 +50,7 @@ describe("contextual panel placement", () => {
     '<table><tbody id="content"></tbody></table>'
   ])("uses a floating fallback when the only host is unsafe: %s", (markup) => {
     const host = mountHost(markup);
-    expect(resolvePanelPlacement(true, {
+    expect(resolvePanelPlacement({
       resolveDockedLayout: () => ({ host, topOffset: 80 }), resolveInlineHost: () => host
     })).toEqual({ kind: "overlay" });
   });

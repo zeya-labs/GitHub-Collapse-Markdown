@@ -75,6 +75,84 @@ describe("Markdown surface discovery", () => {
 });
 
 describe("available GitHub sidebars", () => {
+  it("uses the complete modern repository metadata pane and the whole reading region", () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="prc-PageLayout-PageLayoutContent-BneH9" id="reading-region">
+          <div data-component="SplitPageLayout.Content">${markdown}</div>
+          <div class="prc-PageLayout-PaneWrapper-pHPop">
+            <div data-component="SplitPageLayout.Pane" class="prc-PageLayout-Pane-AyzHK" id="sidebar" style="height:min-content">
+              <div class="borderGrid__VCnF9i">
+                <div class="sidebarSection__oqw6Y8"><h2>About</h2></div>
+                <div class="sidebarSection__oqw6Y8"><h2>Releases</h2></div>
+                <div class="sidebarSection__oqw6Y8"><h2>Languages</h2></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+    const context = githubAdapter.getDockedPanelLayout?.(document);
+    expect(context?.host).toBe(document.getElementById("sidebar"));
+    expect(context?.boundary).toBe(document.getElementById("reading-region"));
+  });
+
+  it.each([
+    'class="Layout-sidebar"',
+    'data-partial-name="codeViewRepoRoute.Sidebar"'
+  ])("places the directory after all sibling metadata grids: %s", (attributes) => {
+    document.body.innerHTML = `
+      <main id="reading-region">${markdown}
+        <rails-partial ${attributes} id="sidebar">
+          <div class="BorderGrid"><div class="BorderGrid-row"><h2>About</h2></div></div>
+          <div class="BorderGrid"><div class="BorderGrid-row"><h2>Releases</h2></div></div>
+          <div class="BorderGrid"><div class="BorderGrid-row"><h2>Languages</h2></div></div>
+        </rails-partial>
+      </main>
+    `;
+    const context = githubAdapter.getDockedPanelLayout?.(document);
+    expect(context?.host).toBe(document.getElementById("sidebar"));
+    expect(context?.boundary).toBe(document.getElementById("reading-region"));
+  });
+
+  it("keeps metadata outside a Rails partial ahead of the directory", () => {
+    document.body.innerHTML = `
+      <main>${markdown}
+        <aside class="Layout-sidebar" id="sidebar">
+          <rails-partial data-partial-name="codeViewRepoRoute.Sidebar">
+            <div class="BorderGrid"><h2>About</h2></div>
+          </rails-partial>
+          <section><h2>Languages</h2></section>
+        </aside>
+      </main>
+    `;
+    expect(githubAdapter.getDockedPanelLayout?.(document)?.host).toBe(document.getElementById("sidebar"));
+  });
+
+  it("uses a single complete native grid even when it contains nested grids", () => {
+    document.body.innerHTML = `
+      <main id="reading-region">${markdown}
+        <aside class="Layout-sidebar" style="height:min-content">
+          <div><div class="BorderGrid" id="complete-grid">
+            <div class="BorderGrid-row"><h2>About</h2><div class="BorderGrid"><h3>Resources</h3></div></div>
+            <div class="BorderGrid-row"><h2>Languages</h2></div>
+          </div></div>
+        </aside>
+      </main>
+    `;
+    const context = githubAdapter.getDockedPanelLayout?.(document);
+    expect(context?.host).toBe(document.getElementById("complete-grid"));
+    expect(context?.boundary).toBe(document.getElementById("reading-region"));
+  });
+
+  it.each([
+    '<nav>Files</nav>',
+    '<nav><div class="BorderGrid">Files</div></nav>'
+  ])("does not mistake a modern navigation pane for repository metadata: %s", (content) => {
+    document.body.innerHTML = `<div data-component="SplitPageLayout.Pane" class="prc-PageLayout-Pane-AyzHK">${content}</div>`;
+    expect(githubAdapter.getDockedPanelLayout?.(document)).toBeNull();
+  });
+
   it("skips zero-width sidebar copies when browser layout is available", () => {
     document.body.innerHTML = '<div class="Layout-sidebar"><div class="BorderGrid" id="collapsed"></div></div><div class="Layout-sidebar"><div class="BorderGrid" id="visible"></div></div>';
     vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1440);
@@ -99,6 +177,7 @@ describe("available GitHub sidebars", () => {
     document.body.innerHTML = markup;
     const context = githubAdapter.getDockedPanelLayout?.(document);
     expect(context?.host).toBe(document.querySelector("#host, #wiki-rightbar"));
+    expect(context?.boundary).toBeNull();
     expect(context?.topOffset).toBe(githubAdapter.getStickyHeaderOffset(document));
   });
 

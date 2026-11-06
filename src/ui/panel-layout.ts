@@ -17,7 +17,6 @@ import {
 interface DockedPanelLayoutElements extends DockedPanelFrameElements, DockedPanelMeasureElements {}
 
 export class PanelLayout {
-  private desktop = false;
   private open = false;
   private placement: ResolvedPanelPlacement = { kind: "overlay" };
   private positionRaf = 0;
@@ -41,7 +40,11 @@ export class PanelLayout {
       passive: true,
       capture: true
     });
-    signal.addEventListener("abort", () => this.disconnectLayoutObservers(), { once: true });
+    window.addEventListener("resize", () => this.invalidateGeometry(), { signal, passive: true });
+    signal.addEventListener("abort", () => {
+      window.cancelAnimationFrame(this.positionRaf);
+      this.disconnectLayoutObservers();
+    }, { once: true });
   }
 
   destroy(): void {
@@ -58,10 +61,9 @@ export class PanelLayout {
     this.invalidateGeometry();
   }
 
-  sync(desktop: boolean, open: boolean): void {
-    this.desktop = desktop;
+  sync(open: boolean): void {
     this.open = open;
-    this.placement = resolvePanelPlacement(this.desktop, this.resolvers);
+    this.placement = resolvePanelPlacement(this.resolvers);
     this.mountPlacement(this.placement);
     this.syncLayoutObservers(this.placement);
     this.elements.root.style.setProperty(
@@ -84,9 +86,7 @@ export class PanelLayout {
       if (this.elements.root.parentElement !== this.elements.dockCell) {
         this.elements.dockCell.append(this.elements.root);
       }
-      if (this.elements.dockRow.parentElement !== placement.context.host) {
-        placement.context.host.append(this.elements.dockRow);
-      }
+      this.keepDockRowLast(placement.context.host);
       return;
     }
 
@@ -100,6 +100,12 @@ export class PanelLayout {
     this.elements.dockRow.remove();
     if (this.elements.root.parentElement !== document.body) {
       document.body.append(this.elements.root);
+    }
+  }
+
+  private keepDockRowLast(host: HTMLElement): void {
+    if (this.elements.dockRow.parentElement !== host || host.lastElementChild !== this.elements.dockRow) {
+      host.append(this.elements.dockRow);
     }
   }
 
@@ -138,11 +144,23 @@ export class PanelLayout {
     }
 
     if (placement.kind === "docked") {
-      this.layoutMutationObserver = new MutationObserver(() => {
+      this.layoutMutationObserver = new MutationObserver((records) => {
+        const nativeContentChanged = records.some((record) =>
+          !this.elements.dockRow.contains(record.target) &&
+          (record.type !== "childList" || [...record.addedNodes, ...record.removedNodes].some(
+            (node) => node !== this.elements.dockRow
+          ))
+        );
+        if (!nativeContentChanged) {
+          return;
+        }
+        this.keepDockRowLast(placement.context.host);
         this.invalidateGeometry();
       });
       this.layoutMutationObserver.observe(placement.context.host, {
-        childList: true
+        childList: true,
+        characterData: true,
+        subtree: true
       });
     }
   }
@@ -162,11 +180,14 @@ export class PanelLayout {
 
   private schedulePositionUpdate(): void {
     window.cancelAnimationFrame(this.positionRaf);
-    this.positionRaf = window.requestAnimationFrame(() => this.updateDockedPosition());
+    this.positionRaf = window.requestAnimationFrame(() => {
+      this.positionRaf = 0;
+      this.updateDockedPosition();
+    });
   }
 
   private shouldPositionDockedPanel(): boolean {
-    return this.desktop && this.placement.kind === "docked" && this.open;
+    return this.placement.kind === "docked" && this.open;
   }
 
   private updateDockedPosition(): void {

@@ -1,6 +1,6 @@
 # GitHub Collapse Markdown
 
-![Version](https://img.shields.io/badge/version-5.2.2-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-5.2.3-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Userscript](https://img.shields.io/badge/userscript-Tampermonkey%2FViolentmonkey-orange.svg)
 
@@ -30,7 +30,9 @@ GitHub 上的长文档通常有这些问题：
 - 同级批量折叠
   `Shift + 点击标题` 可以同时折叠或展开当前层级的同级标题
 - 页面大纲
-  优先嵌入可用侧栏；没有合适侧栏时，在 Markdown 内显示紧凑的 Contents 入口，手机也优先内嵌
+  仓库页面的目录放在 GitHub 原生侧栏的 About、Releases、Languages 等信息之后，默认展开。目录先随侧栏自然滚动，到达顶部后保持在侧栏跟随阅读，接近正文末尾时避让页面底部
+- 自适应插入
+  只要原生侧栏实际可见，就优先使用侧栏，不按固定窗口宽度降级；只有侧栏隐藏或不存在时，才尝试在 Markdown 内嵌入紧凑的 Contents 入口
 - 浮动目录
   只有找不到安全插入位置时才显示浮窗入口。拖动 Contents 标题可移动窗口，也可聚焦标题后用方向键移动（Shift 加速）；窗口不会锁住背景页面
 - 全部折叠 / 全部展开

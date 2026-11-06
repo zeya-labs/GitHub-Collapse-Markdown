@@ -6,8 +6,6 @@ import { PanelDrag } from "./panel-drag";
 import { PanelOutlineView, type PanelRenderState } from "./panel-outline";
 import type { PanelPlacementResolvers } from "./panel-placement";
 
-const DESKTOP_BREAKPOINT = 1180;
-
 interface PanelUIOptions extends PanelPlacementResolvers {
   onCollapseAll: () => void;
   onExpandAll: () => void;
@@ -26,7 +24,6 @@ export class PanelUI {
   private readonly layout: PanelLayout;
   private readonly outlineView: PanelOutlineView;
   private mounted = false;
-  private desktop = false;
   private open = false;
   private layoutChangeRaf = 0;
 
@@ -36,7 +33,8 @@ export class PanelUI {
         dockRow: this.dom.dockRow,
         dockCell: this.dom.dockCell,
         root: this.dom.root,
-        panel: this.dom.panel
+        panel: this.dom.panel,
+        outline: this.dom.outline
       },
       {
         resolveDockedLayout: this.options.resolveDockedLayout,
@@ -140,7 +138,6 @@ export class PanelUI {
   }
 
   private handleViewportChange(force = false): void {
-    this.desktop = window.innerWidth >= DESKTOP_BREAKPOINT;
     this.sync({ resetOpen: force });
   }
 
@@ -161,11 +158,11 @@ export class PanelUI {
     const previousFocus = document.activeElement;
     const previousPlacement = this.layout.getPlacement();
     const previousOpen = this.open;
-    this.layout.sync(this.desktop, this.open);
+    this.layout.sync(this.open);
     const placement = this.layout.getPlacement();
     if (resetOpen || placement !== previousPlacement) {
       this.open = placement === "docked";
-      this.layout.sync(this.desktop, this.open);
+      this.layout.sync(this.open);
     }
     if (!this.open || placement !== previousPlacement) {
       this.actions.close();

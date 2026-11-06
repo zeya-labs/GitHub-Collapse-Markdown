@@ -6,13 +6,17 @@
 
 ## Latest fixes and validation
 
-- Version 5.2.2: `npm run verify` passes the TypeScript check, 144 automated tests, and userscript build. Both userscript outputs match.
-- 40 Chromium layout and interaction checks pass with official Primer CSS and native table/sidebar fixtures, including the downloaded Node.js README. GitHub static assets are blocked by the environment, so these local fixtures do not establish full live-site or userscript-manager compatibility.
+- Version 5.2.3: `npm run verify` passes the TypeScript check, 165 automated tests, and userscript build. Both userscript outputs match.
+- The repository outline belongs after all native sidebar metadata, including About, Releases, and Languages. It starts in normal document flow, follows reading after reaching the sticky offset, and avoids the reading-region end. This is core behavior, not an optional layout enhancement.
+- 25 Chromium checks pass against the actual built userscript with a downloaded modern GitHub metadata pane and Node.js README, local Primer CSS, and modern/table layout fixtures. Coverage includes metadata order, normal scrolling before pinning, following beyond a short sidebar's bottom, internal outline scrolling, footer avoidance, return to normal flow, late metadata, visible sidebars at 1000px, hidden-sidebar fallback, and legacy sidebar following. The scroll sequence was also recorded.
+- Modern `SplitPageLayout.Pane` metadata hosts and older sidebar grids are both supported. The complete metadata owner is used when native sections have sibling containers. Navigation panes are excluded, late native sections remain before the outline, and the reading region supplies the follow boundary instead of the short metadata pane.
+- Sidebar visibility determines placement; there is no fixed viewport-width gate. Flow height remains stable when the outline initially starts below the viewport, and content measurement preserves internal scrolling for long outlines.
+- Earlier 5.2.2 validation passed 40 Chromium layout checks, 23 focused interaction checks, and 18 floating-window checks with official Primer CSS and native fixtures. GitHub static assets are blocked by the environment, so these local reproductions do not establish full live-site or userscript-manager compatibility.
 - Interaction styling follows the official [Primer ActionList source](https://github.com/primer/react/blob/main/packages/react/src/ActionList/ActionList.module.css): neutral transparent-control hover/active colors, 6px/8px content padding, medium radius, 14px/20px text, 32px mouse rows, and pointer-coarse touch targets. Narrow mouse windows keep compact spacing.
-- All 23 focused Chromium interaction checks pass: native hover/press color matching, compact mouse and coarse-pointer spacing, keyboard focus, real touch response and release, and correct current-section remeasurement after opening inline contents.
+- The focused interaction checks cover native hover/press color matching, compact mouse and coarse-pointer spacing, keyboard focus, real touch response and release, and correct current-section remeasurement after opening inline contents.
 - Current-section state uses text weight and a small indicator without a filled background. Hover is limited to hover-capable fine pointers; pressing, keyboard focus, and current-section state are independent. Native browser tap overlays are suppressed in favor of the same neutral active feedback.
-- Placement prefers a usable desktop sidebar, then a safe visible Markdown container on every screen size. Inline contents starts collapsed; hidden previews, editors, navigation, and invalid insertion hosts are excluded. Other containers are tried before falling back to a floating panel.
-- All 18 Chromium floating-window checks pass, including real mouse/touch movement, keyboard steps, close/reopen position, stable height at viewport edges, resize clamping, and capture cleanup.
+- Placement prefers a visible native metadata sidebar at any viewport width, then a safe visible Markdown container. Inline contents starts collapsed; hidden previews, editors, navigation, and invalid insertion hosts are excluded. Other containers are tried before falling back to a floating panel.
+- Floating-window checks cover real mouse/touch movement, keyboard steps, close/reopen position, stable height at viewport edges, resize clamping, and capture cleanup.
 - The fallback is a nonmodal, draggable window. It supports pointer and keyboard movement, viewport bounds, remembered position while the session remains mounted, and focus restoration without disabling the page.
 - The header shows Contents and two compact controls: actions and close. Bulk commands live in a native details disclosure; Escape, outside dismissal, focus return, and bottom-edge menu placement are covered.
 - Removed decorative outline rails, per-level color aliases, three layout wrappers, redundant heading state, and Unicode toggle text. Heading chevrons use the button expanded state while preserving native heading metrics.
@@ -31,6 +35,7 @@ Using the previous tracked `README.md` as the baseline, the requirements split i
 
 ### P0: must work
 
+- Place repository contents after all native sidebar metadata and follow document scrolling in that sidebar; only use inline/floating fallbacks when a usable sidebar is unavailable
 - Detect rendered Markdown containers on:
   - GitHub repository/file pages
   - Issue / Pull Request comment bodies
@@ -108,6 +113,7 @@ These pages were fetched on 2026-04-17 and used to verify current DOM assumption
 
 ### Verified working in automated tests
 
+- Native metadata order, modern and legacy sidebar hosts, scroll-follow geometry, and visible-sidebar priority without a viewport-width gate
 - Modern GitHub markdown container detection
 - Comment-body container detection
 - Gist markdown container detection

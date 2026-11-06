@@ -13,25 +13,20 @@ const STICKY_HEADER_SELECTOR = [
   ".Header"
 ].join(", ");
 const GITHUB_CONTENT_ROOT_SELECTOR = ".markdown-body, [data-testid='markdown-body'], [data-testid='markdown-preview']";
-const GITHUB_DOCK_HOST_SELECTORS = [
-  "rails-partial[data-partial-name='codeViewRepoRoute.Sidebar'] .BorderGrid",
+const GITHUB_SIDEBAR_SELECTORS = [
   "rails-partial[data-partial-name='codeViewRepoRoute.Sidebar']",
-  ".Layout-sidebar .BorderGrid",
   ".Layout-sidebar",
   "[data-testid='issue-metadata-pane']",
   "[data-testid='discussion-sidebar']",
   ".discussion-sidebar",
-  "#wiki-rightbar"
+  "#wiki-rightbar",
+  "[data-component='SplitPageLayout.Pane']",
+  "[class*='PageLayout-Pane-']"
 ];
-const GITHUB_DOCK_BOUNDARY_SELECTORS = [
-  "[class*='PageLayout-PaneWrapper']",
-  "[class*='PageLayout-Pane-']",
-  ".Layout-sidebar",
-  "[data-testid='issue-metadata-pane']",
-  "[data-testid='discussion-sidebar']",
-  ".discussion-sidebar",
-  "#wiki-rightbar"
-];
+const GITHUB_SIDEBAR_SELECTOR = GITHUB_SIDEBAR_SELECTORS.join(", ");
+const MODERN_PANE_SELECTOR = "[data-component='SplitPageLayout.Pane'], [class*='PageLayout-Pane-']";
+const METADATA_GRID_SELECTOR = ".BorderGrid, [class*='borderGrid__']";
+const UNSAFE_DOCK_CONTEXT_SELECTOR = ".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']";
 
 interface GitHubContainerDescriptor {
   id?: string;
@@ -191,7 +186,27 @@ export const githubAdapter: SiteAdapter = {
 };
 
 function resolveGitHubDockHost(document: Document): HTMLElement | null {
-  return queryFirst(document, GITHUB_DOCK_HOST_SELECTORS);
+  const visited = new Set<HTMLElement>();
+  for (const selector of GITHUB_SIDEBAR_SELECTORS) {
+    for (const candidate of document.querySelectorAll<HTMLElement>(selector)) {
+      if (!isMetadataSidebar(candidate)) {
+        continue;
+      }
+
+      const sidebar = resolveSidebarOwner(candidate);
+      if (visited.has(sidebar)) {
+        continue;
+      }
+      visited.add(sidebar);
+
+      const host = resolveCompleteSidebarHost(sidebar);
+      if (isSafeDockHost(host)) {
+        return host;
+      }
+    }
+  }
+
+  return null;
 }
 
 function isDockVisibilityMutation(mutation: MutationRecord): boolean {
@@ -200,35 +215,72 @@ function isDockVisibilityMutation(mutation: MutationRecord): boolean {
     return false;
   }
 
-  const selector = GITHUB_DOCK_HOST_SELECTORS.join(", ");
-  return target.matches(selector) || Boolean(target.querySelector(selector));
+  return target.matches(GITHUB_SIDEBAR_SELECTOR) || Boolean(target.querySelector(GITHUB_SIDEBAR_SELECTOR));
 }
 
 function resolveGitHubDockBoundary(host: HTMLElement): HTMLElement | null {
-  return closestFirst(host, GITHUB_DOCK_BOUNDARY_SELECTORS);
-}
+  const sidebar = resolveSidebarOwner(host);
+  const contentRoots = queryContentCandidates(host.ownerDocument, GITHUB_CONTENT_ROOT_SELECTOR)
+    .filter((element) => !sidebar.contains(element));
 
-function queryFirst(document: Document, selectors: string[]): HTMLElement | null {
-  for (const selector of selectors) {
-    const match = Array.from(document.querySelectorAll<HTMLElement>(selector))
-      .find((element) => isVisibleElement(element) && !isEditableElement(element) &&
-        !element.closest(".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']") &&
-        !element.closest(GITHUB_CONTENT_ROOT_SELECTOR));
-    if (match) {
-      return match;
+  // The sidebar can be min-content tall. Follow the entire reading region instead.
+  for (let ancestor = sidebar.parentElement; ancestor && ancestor !== host.ownerDocument.body; ancestor = ancestor.parentElement) {
+    if (contentRoots.some((element) => ancestor.contains(element))) {
+      return ancestor;
     }
   }
 
   return null;
 }
 
-function closestFirst(element: HTMLElement, selectors: string[]): HTMLElement | null {
-  for (const selector of selectors) {
-    const match = element.closest<HTMLElement>(selector);
-    if (match) {
-      return match;
+function isMetadataSidebar(element: HTMLElement): boolean {
+  return !element.matches(MODERN_PANE_SELECTOR) || Boolean(element.querySelector(METADATA_GRID_SELECTOR));
+}
+
+function resolveSidebarOwner(element: HTMLElement): HTMLElement {
+  let sidebar = element.closest<HTMLElement>(GITHUB_SIDEBAR_SELECTOR) ?? element;
+  for (let ancestor = sidebar.parentElement?.closest<HTMLElement>(GITHUB_SIDEBAR_SELECTOR);
+    ancestor;
+    ancestor = ancestor.parentElement?.closest<HTMLElement>(GITHUB_SIDEBAR_SELECTOR)) {
+    if (isMetadataSidebar(ancestor)) {
+      sidebar = ancestor;
     }
   }
 
-  return null;
+  return sidebar;
+}
+
+function resolveCompleteSidebarHost(sidebar: HTMLElement): HTMLElement {
+  const grid = sidebar.querySelector<HTMLElement>(".BorderGrid");
+  if (!grid) {
+    return sidebar;
+  }
+
+  // Reuse native table rows only when this grid owns every metadata section.
+  let branch: Node = grid;
+  for (let parent = grid.parentElement; parent; parent = parent.parentElement) {
+    const hasOtherContent = Array.from(parent.childNodes).some((node) => {
+      if (node === branch || isManagedNode(node) || node.nodeType === Node.COMMENT_NODE) {
+        return false;
+      }
+      if (node instanceof HTMLElement) {
+        return !node.matches("script, style, template");
+      }
+      return Boolean(node.textContent?.trim());
+    });
+    if (hasOtherContent) {
+      return sidebar;
+    }
+    if (parent === sidebar) {
+      return grid;
+    }
+    branch = parent;
+  }
+
+  return sidebar;
+}
+
+function isSafeDockHost(element: HTMLElement): boolean {
+  return isVisibleElement(element) && !isEditableElement(element) &&
+    !element.closest(UNSAFE_DOCK_CONTEXT_SELECTOR) && !element.closest(GITHUB_CONTENT_ROOT_SELECTOR);
 }

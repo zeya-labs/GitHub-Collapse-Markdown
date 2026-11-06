@@ -16,8 +16,8 @@ export interface PanelPlacementResolvers {
   resolveInlineHost?: () => HTMLElement | null;
 }
 
-export function resolvePanelPlacement(desktop: boolean, resolvers: PanelPlacementResolvers): ResolvedPanelPlacement {
-  const dockedLayout = desktop ? resolvers.resolveDockedLayout?.() ?? null : null;
+export function resolvePanelPlacement(resolvers: PanelPlacementResolvers): ResolvedPanelPlacement {
+  const dockedLayout = resolvers.resolveDockedLayout?.() ?? null;
   if (dockedLayout && isUsablePanelHost(dockedLayout.host)) {
     return {
       kind: "docked",

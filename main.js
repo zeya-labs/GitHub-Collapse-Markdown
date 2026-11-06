@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        GitHub Collapse Markdown
-// @version     5.2.2
+// @version     5.2.3
 // @description GitHub Markdown 标题折叠脚本，支持大纲、状态记忆与现代 GitHub 页面
 // @license     MIT
 // @author      Xyea
@@ -291,25 +291,20 @@
     ".Header"
   ].join(", ");
   var GITHUB_CONTENT_ROOT_SELECTOR = ".markdown-body, [data-testid='markdown-body'], [data-testid='markdown-preview']";
-  var GITHUB_DOCK_HOST_SELECTORS = [
-    "rails-partial[data-partial-name='codeViewRepoRoute.Sidebar'] .BorderGrid",
+  var GITHUB_SIDEBAR_SELECTORS = [
     "rails-partial[data-partial-name='codeViewRepoRoute.Sidebar']",
-    ".Layout-sidebar .BorderGrid",
     ".Layout-sidebar",
     "[data-testid='issue-metadata-pane']",
     "[data-testid='discussion-sidebar']",
     ".discussion-sidebar",
-    "#wiki-rightbar"
+    "#wiki-rightbar",
+    "[data-component='SplitPageLayout.Pane']",
+    "[class*='PageLayout-Pane-']"
   ];
-  var GITHUB_DOCK_BOUNDARY_SELECTORS = [
-    "[class*='PageLayout-PaneWrapper']",
-    "[class*='PageLayout-Pane-']",
-    ".Layout-sidebar",
-    "[data-testid='issue-metadata-pane']",
-    "[data-testid='discussion-sidebar']",
-    ".discussion-sidebar",
-    "#wiki-rightbar"
-  ];
+  var GITHUB_SIDEBAR_SELECTOR = GITHUB_SIDEBAR_SELECTORS.join(", ");
+  var MODERN_PANE_SELECTOR = "[data-component='SplitPageLayout.Pane'], [class*='PageLayout-Pane-']";
+  var METADATA_GRID_SELECTOR = ".BorderGrid, [class*='borderGrid__']";
+  var UNSAFE_DOCK_CONTEXT_SELECTOR = ".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']";
   function isGitHubRootHomePath(location) {
     return location.pathname === "/";
   }
@@ -451,36 +446,82 @@
     }
   };
   function resolveGitHubDockHost(document2) {
-    return queryFirst(document2, GITHUB_DOCK_HOST_SELECTORS);
+    const visited = /* @__PURE__ */ new Set();
+    for (const selector of GITHUB_SIDEBAR_SELECTORS) {
+      for (const candidate of document2.querySelectorAll(selector)) {
+        if (!isMetadataSidebar(candidate)) {
+          continue;
+        }
+        const sidebar = resolveSidebarOwner(candidate);
+        if (visited.has(sidebar)) {
+          continue;
+        }
+        visited.add(sidebar);
+        const host = resolveCompleteSidebarHost(sidebar);
+        if (isSafeDockHost(host)) {
+          return host;
+        }
+      }
+    }
+    return null;
   }
   function isDockVisibilityMutation(mutation) {
     const target = mutation.target instanceof HTMLElement ? mutation.target : null;
     if (mutation.type !== "attributes" || !target || isManagedNode(target) || target.closest(".ghcm-root, .ghcm-dock-row")) {
       return false;
     }
-    const selector = GITHUB_DOCK_HOST_SELECTORS.join(", ");
-    return target.matches(selector) || Boolean(target.querySelector(selector));
+    return target.matches(GITHUB_SIDEBAR_SELECTOR) || Boolean(target.querySelector(GITHUB_SIDEBAR_SELECTOR));
   }
   function resolveGitHubDockBoundary(host) {
-    return closestFirst(host, GITHUB_DOCK_BOUNDARY_SELECTORS);
-  }
-  function queryFirst(document2, selectors) {
-    for (const selector of selectors) {
-      const match = Array.from(document2.querySelectorAll(selector)).find((element) => isVisibleElement(element) && !isEditableElement(element) && !element.closest(".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']") && !element.closest(GITHUB_CONTENT_ROOT_SELECTOR));
-      if (match) {
-        return match;
+    const sidebar = resolveSidebarOwner(host);
+    const contentRoots = queryContentCandidates(host.ownerDocument, GITHUB_CONTENT_ROOT_SELECTOR).filter((element) => !sidebar.contains(element));
+    for (let ancestor = sidebar.parentElement; ancestor && ancestor !== host.ownerDocument.body; ancestor = ancestor.parentElement) {
+      if (contentRoots.some((element) => ancestor.contains(element))) {
+        return ancestor;
       }
     }
     return null;
   }
-  function closestFirst(element, selectors) {
-    for (const selector of selectors) {
-      const match = element.closest(selector);
-      if (match) {
-        return match;
+  function isMetadataSidebar(element) {
+    return !element.matches(MODERN_PANE_SELECTOR) || Boolean(element.querySelector(METADATA_GRID_SELECTOR));
+  }
+  function resolveSidebarOwner(element) {
+    let sidebar = element.closest(GITHUB_SIDEBAR_SELECTOR) ?? element;
+    for (let ancestor = sidebar.parentElement?.closest(GITHUB_SIDEBAR_SELECTOR); ancestor; ancestor = ancestor.parentElement?.closest(GITHUB_SIDEBAR_SELECTOR)) {
+      if (isMetadataSidebar(ancestor)) {
+        sidebar = ancestor;
       }
     }
-    return null;
+    return sidebar;
+  }
+  function resolveCompleteSidebarHost(sidebar) {
+    const grid = sidebar.querySelector(".BorderGrid");
+    if (!grid) {
+      return sidebar;
+    }
+    let branch = grid;
+    for (let parent = grid.parentElement; parent; parent = parent.parentElement) {
+      const hasOtherContent = Array.from(parent.childNodes).some((node) => {
+        if (node === branch || isManagedNode(node) || node.nodeType === Node.COMMENT_NODE) {
+          return false;
+        }
+        if (node instanceof HTMLElement) {
+          return !node.matches("script, style, template");
+        }
+        return Boolean(node.textContent?.trim());
+      });
+      if (hasOtherContent) {
+        return sidebar;
+      }
+      if (parent === sidebar) {
+        return grid;
+      }
+      branch = parent;
+    }
+    return sidebar;
+  }
+  function isSafeDockHost(element) {
+    return isVisibleElement(element) && !isEditableElement(element) && !element.closest(UNSAFE_DOCK_CONTEXT_SELECTOR) && !element.closest(GITHUB_CONTENT_ROOT_SELECTOR);
   }
 
   // src/adapters/index.ts
@@ -1497,11 +1538,39 @@
   // src/ui/panel-frame.ts
   var DOCKED_PANEL_BOUNDARY_BOTTOM_GAP = 30;
   var DOCKED_PANEL_VIEWPORT_BOTTOM_GAP = 16;
+  function stylePixels(style, property) {
+    return Number.parseFloat(style.getPropertyValue(property)) || 0;
+  }
+  function verticalMargins(element) {
+    const style = window.getComputedStyle(element);
+    return stylePixels(style, "margin-top") + stylePixels(style, "margin-bottom");
+  }
+  function measureOutlineContentHeight(outline) {
+    const style = window.getComputedStyle(outline);
+    const lastChild = outline.lastElementChild;
+    if (lastChild instanceof HTMLElement) {
+      const contentBottom = lastChild.getBoundingClientRect().bottom - outline.getBoundingClientRect().top + outline.scrollTop;
+      if (contentBottom > 0) {
+        return contentBottom + stylePixels(window.getComputedStyle(lastChild), "margin-bottom") + stylePixels(style, "padding-bottom") + stylePixels(style, "border-bottom-width");
+      }
+    }
+    return outline.scrollHeight + stylePixels(style, "border-top-width") + stylePixels(style, "border-bottom-width");
+  }
+  function measureNaturalPanelHeight({ panel, outline }) {
+    const fallback = Math.max(panel.scrollHeight, panel.offsetHeight, 0);
+    if (!outline || outline.parentElement !== panel) {
+      return fallback;
+    }
+    const style = window.getComputedStyle(panel);
+    const children = Array.from(panel.children).filter((child) => child instanceof HTMLElement);
+    const contentHeight = children.reduce((height, child) => height + verticalMargins(child) + (child === outline ? measureOutlineContentHeight(outline) : child.offsetHeight), 0);
+    const naturalHeight = contentHeight + stylePixels(style, "padding-top") + stylePixels(style, "padding-bottom") + stylePixels(style, "border-top-width") + stylePixels(style, "border-bottom-width") + stylePixels(style, "row-gap") * Math.max(children.length - 1, 0);
+    return naturalHeight > 0 ? naturalHeight : fallback;
+  }
   function measureDockedPanel(elements, context) {
-    const rowRect = elements.dockRow.getBoundingClientRect();
     const cellRect = elements.dockCell.getBoundingClientRect();
     const cellStyle = window.getComputedStyle(elements.dockCell);
-    const inset = (property) => Number.parseFloat(cellStyle.getPropertyValue(property)) || 0;
+    const inset = (property) => stylePixels(cellStyle, property);
     const leftInset = inset("padding-left") + inset("border-left-width");
     const rightInset = inset("padding-right") + inset("border-right-width");
     const topInset = inset("padding-top") + inset("border-top-width");
@@ -1510,29 +1579,25 @@
       boundaryViewportBottom: dockedBoundaryRect ? dockedBoundaryRect.bottom - DOCKED_PANEL_BOUNDARY_BOTTOM_GAP : Number.POSITIVE_INFINITY,
       cellLeft: Math.max(cellRect.left + leftInset, 0),
       cellWidth: Math.max(cellRect.width - leftInset - rightInset, 0),
-      naturalPanelHeight: Math.max(elements.panel.scrollHeight, elements.panel.offsetHeight, 0),
-      rowViewportTop: rowRect.top + topInset
+      naturalPanelHeight: measureNaturalPanelHeight(elements),
+      rowViewportTop: cellRect.top + topInset
     };
   }
   function computeDockedPanelFrame(measurement, topOffset, viewportHeight) {
     const viewportBottom = viewportHeight - DOCKED_PANEL_VIEWPORT_BOTTOM_GAP;
-    const rowBoundedMaxHeight = Math.max(
-      Math.min(viewportBottom - measurement.rowViewportTop, measurement.boundaryViewportBottom - measurement.rowViewportTop),
-      0
-    );
-    const rowHeight = Math.max(Math.min(Math.ceil(measurement.naturalPanelHeight), Math.ceil(rowBoundedMaxHeight)), 0);
+    const viewportMaxHeight = Math.max(viewportBottom - topOffset, 0);
+    const preferredHeight = Math.min(measurement.naturalPanelHeight, viewportMaxHeight);
     if (measurement.rowViewportTop > topOffset) {
       return {
         mode: "flow",
         panelLeft: measurement.cellLeft,
-        panelHeight: rowHeight,
-        panelMaxHeight: rowBoundedMaxHeight,
+        panelHeight: Math.max(Math.ceil(preferredHeight), 0),
+        panelMaxHeight: viewportMaxHeight,
         panelTop: measurement.rowViewportTop,
         panelWidth: measurement.cellWidth,
         rowHeight: 0
       };
     }
-    const preferredHeight = Math.min(measurement.naturalPanelHeight, Math.max(viewportBottom - topOffset, 0));
     let panelTop = topOffset;
     if (measurement.boundaryViewportBottom < panelTop + preferredHeight) {
       panelTop = Math.max(measurement.rowViewportTop, measurement.boundaryViewportBottom - preferredHeight);
@@ -1551,9 +1616,9 @@
   }
   function applyDockedPanelFrame(elements, frame) {
     elements.root.classList.toggle("is-floating", frame.mode === "fixed");
+    elements.root.style.setProperty("--ghcm-panel-height", `${frame.panelHeight}px`);
+    elements.root.style.setProperty("--ghcm-panel-max-height", `${frame.panelMaxHeight}px`);
     if (frame.mode === "fixed") {
-      elements.root.style.setProperty("--ghcm-panel-height", `${frame.panelHeight}px`);
-      elements.root.style.setProperty("--ghcm-panel-max-height", `${frame.panelMaxHeight}px`);
       elements.root.style.setProperty("--ghcm-panel-left", `${frame.panelLeft}px`);
       elements.root.style.setProperty("--ghcm-panel-top", `${frame.panelTop}px`);
       elements.root.style.setProperty("--ghcm-panel-width", `${frame.panelWidth}px`);
@@ -1561,8 +1626,6 @@
       elements.dockRow.style.minHeight = frame.rowHeight > 0 ? `${frame.rowHeight}px` : "";
       return;
     }
-    elements.root.style.removeProperty("--ghcm-panel-height");
-    elements.root.style.removeProperty("--ghcm-panel-max-height");
     elements.root.style.removeProperty("--ghcm-panel-left");
     elements.root.style.removeProperty("--ghcm-panel-top");
     elements.root.style.removeProperty("--ghcm-panel-width");
@@ -1583,8 +1646,8 @@
   // src/ui/panel-placement.ts
   var UNSAFE_PANEL_CONTEXT_SELECTOR = ".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']";
   var INVALID_PANEL_HOST_TAGS = /* @__PURE__ */ new Set(["P", "SPAN", "PRE", "CODE", "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "UL", "OL", "DL"]);
-  function resolvePanelPlacement(desktop, resolvers) {
-    const dockedLayout = desktop ? resolvers.resolveDockedLayout?.() ?? null : null;
+  function resolvePanelPlacement(resolvers) {
+    const dockedLayout = resolvers.resolveDockedLayout?.() ?? null;
     if (dockedLayout && isUsablePanelHost(dockedLayout.host)) {
       return {
         kind: "docked",
@@ -1618,7 +1681,6 @@
     constructor(elements, resolvers) {
       this.elements = elements;
       this.resolvers = resolvers;
-      __publicField(this, "desktop", false);
       __publicField(this, "open", false);
       __publicField(this, "placement", { kind: "overlay" });
       __publicField(this, "positionRaf", 0);
@@ -1637,7 +1699,11 @@
         passive: true,
         capture: true
       });
-      signal.addEventListener("abort", () => this.disconnectLayoutObservers(), { once: true });
+      window.addEventListener("resize", () => this.invalidateGeometry(), { signal, passive: true });
+      signal.addEventListener("abort", () => {
+        window.cancelAnimationFrame(this.positionRaf);
+        this.disconnectLayoutObservers();
+      }, { once: true });
     }
     destroy() {
       window.cancelAnimationFrame(this.positionRaf);
@@ -1650,10 +1716,9 @@
     refreshGeometry() {
       this.invalidateGeometry();
     }
-    sync(desktop, open) {
-      this.desktop = desktop;
+    sync(open) {
       this.open = open;
-      this.placement = resolvePanelPlacement(this.desktop, this.resolvers);
+      this.placement = resolvePanelPlacement(this.resolvers);
       this.mountPlacement(this.placement);
       this.syncLayoutObservers(this.placement);
       this.elements.root.style.setProperty(
@@ -1674,9 +1739,7 @@
         if (this.elements.root.parentElement !== this.elements.dockCell) {
           this.elements.dockCell.append(this.elements.root);
         }
-        if (this.elements.dockRow.parentElement !== placement.context.host) {
-          placement.context.host.append(this.elements.dockRow);
-        }
+        this.keepDockRowLast(placement.context.host);
         return;
       }
       this.elements.dockRow.remove();
@@ -1688,6 +1751,11 @@
       this.elements.dockRow.remove();
       if (this.elements.root.parentElement !== document.body) {
         document.body.append(this.elements.root);
+      }
+    }
+    keepDockRowLast(host) {
+      if (this.elements.dockRow.parentElement !== host || host.lastElementChild !== this.elements.dockRow) {
+        host.append(this.elements.dockRow);
       }
     }
     handleScroll(event) {
@@ -1715,11 +1783,22 @@
         nextTargets.forEach((element) => this.resizeObserver?.observe(element));
       }
       if (placement.kind === "docked") {
-        this.layoutMutationObserver = new MutationObserver(() => {
+        this.layoutMutationObserver = new MutationObserver((records) => {
+          const nativeContentChanged = records.some(
+            (record) => !this.elements.dockRow.contains(record.target) && (record.type !== "childList" || [...record.addedNodes, ...record.removedNodes].some(
+              (node) => node !== this.elements.dockRow
+            ))
+          );
+          if (!nativeContentChanged) {
+            return;
+          }
+          this.keepDockRowLast(placement.context.host);
           this.invalidateGeometry();
         });
         this.layoutMutationObserver.observe(placement.context.host, {
-          childList: true
+          childList: true,
+          characterData: true,
+          subtree: true
         });
       }
     }
@@ -1736,10 +1815,13 @@
     }
     schedulePositionUpdate() {
       window.cancelAnimationFrame(this.positionRaf);
-      this.positionRaf = window.requestAnimationFrame(() => this.updateDockedPosition());
+      this.positionRaf = window.requestAnimationFrame(() => {
+        this.positionRaf = 0;
+        this.updateDockedPosition();
+      });
     }
     shouldPositionDockedPanel() {
-      return this.desktop && this.placement.kind === "docked" && this.open;
+      return this.placement.kind === "docked" && this.open;
     }
     updateDockedPosition() {
       if (!this.shouldPositionDockedPanel()) {
@@ -2266,7 +2348,6 @@
   }
 
   // src/ui/panel.ts
-  var DESKTOP_BREAKPOINT = 1180;
   var PanelUI = class {
     constructor(options) {
       this.options = options;
@@ -2282,7 +2363,6 @@
       __publicField(this, "layout");
       __publicField(this, "outlineView");
       __publicField(this, "mounted", false);
-      __publicField(this, "desktop", false);
       __publicField(this, "open", false);
       __publicField(this, "layoutChangeRaf", 0);
       this.layout = new PanelLayout(
@@ -2290,7 +2370,8 @@
           dockRow: this.dom.dockRow,
           dockCell: this.dom.dockCell,
           root: this.dom.root,
-          panel: this.dom.panel
+          panel: this.dom.panel,
+          outline: this.dom.outline
         },
         {
           resolveDockedLayout: this.options.resolveDockedLayout,
@@ -2379,7 +2460,6 @@
       }
     }
     handleViewportChange(force = false) {
-      this.desktop = window.innerWidth >= DESKTOP_BREAKPOINT;
       this.sync({ resetOpen: force });
     }
     applyOpenState(open) {
@@ -2398,11 +2478,11 @@
       const previousFocus = document.activeElement;
       const previousPlacement = this.layout.getPlacement();
       const previousOpen = this.open;
-      this.layout.sync(this.desktop, this.open);
+      this.layout.sync(this.open);
       const placement = this.layout.getPlacement();
       if (resetOpen || placement !== previousPlacement) {
         this.open = placement === "docked";
-        this.layout.sync(this.desktop, this.open);
+        this.layout.sync(this.open);
       }
       if (!this.open || placement !== previousPlacement) {
         this.actions.close();

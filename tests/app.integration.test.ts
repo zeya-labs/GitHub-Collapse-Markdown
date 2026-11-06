@@ -137,7 +137,48 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("prefers the pane wrapper bottom over the min-content pane when clamping the docked panel", () => {
+  it.each([768, 1024, 1179])("keeps an available native sidebar at %ipx", (width) => {
+    setViewportWidth(width);
+    document.body.innerHTML = githubReadmePageFixture;
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+
+    expect(document.querySelector(".ghcm-root")?.classList.contains("is-docked")).toBe(true);
+    expect(document.querySelector(".ghcm-panel")?.classList.contains("is-open")).toBe(true);
+    expect(document.querySelector(".markdown-body > .ghcm-root")).toBeNull();
+  });
+
+  it("keeps contents after all native metadata, including later sidebar updates", async () => {
+    document.body.innerHTML = githubReadmePageFixture;
+    const sidebar = document.querySelector<HTMLElement>(".BorderGrid")!;
+    const metadata = (title: string) => {
+      const row = document.createElement("div");
+      row.className = "BorderGrid-row";
+      row.innerHTML = `<div class="BorderGrid-cell"><h2>${title}</h2><p>Native metadata</p></div>`;
+      return row;
+    };
+    const releases = metadata("Releases");
+    const languages = metadata("Languages");
+    sidebar.append(releases, languages);
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+    const row = document.querySelector(".ghcm-dock-row")!;
+    expect(sidebar.lastElementChild).toBe(row);
+    expect(row.previousElementSibling).toBe(languages);
+
+    const packages = metadata("Packages");
+    sidebar.append(packages);
+    await sleep(180);
+
+    expect(sidebar.lastElementChild).toBe(row);
+    expect(row.previousElementSibling).toBe(packages);
+    expect(sidebar.contains(releases)).toBe(true);
+    expect(sidebar.contains(languages)).toBe(true);
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+    expect(document.querySelectorAll(".ghcm-dock-row")).toHaveLength(1);
+  });
+
+  it("uses the complete reading layout bottom instead of the short metadata pane", () => {
     document.body.innerHTML = githubReadmePageFixture;
     Object.defineProperty(document.querySelector("header[role='banner']"), "offsetHeight", {
       configurable: true,
@@ -173,7 +214,7 @@ describe("GitHubCollapseMarkdownApp integration", () => {
       if (this.classList.contains("ghcm-dock-cell")) {
         return DOMRect.fromRect({ x: 1080, y: 40, width: 320, height: 0 });
       }
-      if (this.classList.contains("prc-PageLayout-PaneWrapper-pHPop")) {
+      if (this.classList.contains("prc-PageLayout-PageLayoutRoot-xyz")) {
         return DOMRect.fromRect({ x: 1080, y: 0, width: 320, height: 700 });
       }
       if (this.classList.contains("prc-PageLayout-Pane-AyzHK")) {
@@ -229,7 +270,7 @@ describe("GitHubCollapseMarkdownApp integration", () => {
       if (this.classList.contains("ghcm-dock-cell")) {
         return DOMRect.fromRect({ x: 1080, y: -600, width: 320, height: 0 });
       }
-      if (this.classList.contains("prc-PageLayout-PaneWrapper-pHPop")) {
+      if (this.classList.contains("prc-PageLayout-PageLayoutRoot-xyz")) {
         return DOMRect.fromRect({ x: 1080, y: -700, width: 320, height: 1140 });
       }
       if (this.classList.contains("prc-PageLayout-Pane-AyzHK")) {
@@ -259,7 +300,7 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     const sidebarHost = document.querySelector(
       "rails-partial[data-partial-name='codeViewRepoRoute.Sidebar'] .BorderGrid"
     ) as HTMLElement;
-    const paneWrapper = document.querySelector(".prc-PageLayout-PaneWrapper-pHPop") as HTMLElement;
+    const readingLayout = document.querySelector(".prc-PageLayout-PageLayoutRoot-xyz") as HTMLElement;
 
     class ResizeObserverMock {
       private static callback: ResizeObserverCallback | null = null;
@@ -324,7 +365,7 @@ describe("GitHubCollapseMarkdownApp integration", () => {
       if (this.classList.contains("ghcm-dock-cell")) {
         return DOMRect.fromRect({ x: 1080, y: rowTop, width: 320, height: 0 });
       }
-      if (this === paneWrapper) {
+      if (this === readingLayout) {
         return DOMRect.fromRect({ x: 1080, y: 0, width: 320, height: 900 });
       }
       if (this.classList.contains("prc-PageLayout-Pane-AyzHK")) {
@@ -340,16 +381,16 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     const root = document.querySelector(".ghcm-root") as HTMLElement;
     expect(root.classList.contains("is-floating")).toBe(false);
     expect(root.style.getPropertyValue("--ghcm-panel-top")).toBe("");
-    expect(root.style.getPropertyValue("--ghcm-panel-height")).toBe("");
-    expect(root.style.getPropertyValue("--ghcm-panel-max-height")).toBe("");
+    expect(root.style.getPropertyValue("--ghcm-panel-height")).toBe("360px");
+    expect(root.style.getPropertyValue("--ghcm-panel-max-height")).toBe("802px");
 
     rowTop = 260;
     ResizeObserverMock.emit(sidebarHost);
 
     expect(root.classList.contains("is-floating")).toBe(false);
     expect(root.style.getPropertyValue("--ghcm-panel-top")).toBe("");
-    expect(root.style.getPropertyValue("--ghcm-panel-height")).toBe("");
-    expect(root.style.getPropertyValue("--ghcm-panel-max-height")).toBe("");
+    expect(root.style.getPropertyValue("--ghcm-panel-height")).toBe("360px");
+    expect(root.style.getPropertyValue("--ghcm-panel-max-height")).toBe("802px");
   });
 
   it("recomputes the docked position when scrolling changes the sidebar row geometry", () => {
@@ -360,7 +401,7 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     });
 
     let rowTop = 280;
-    const paneWrapper = document.querySelector(".prc-PageLayout-PaneWrapper-pHPop") as HTMLElement;
+    const readingLayout = document.querySelector(".prc-PageLayout-PageLayoutRoot-xyz") as HTMLElement;
 
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
       callback(0);
@@ -391,7 +432,7 @@ describe("GitHubCollapseMarkdownApp integration", () => {
       if (this.classList.contains("ghcm-dock-cell")) {
         return DOMRect.fromRect({ x: 1080, y: rowTop, width: 320, height: 0 });
       }
-      if (this === paneWrapper) {
+      if (this === readingLayout) {
         return DOMRect.fromRect({ x: 1080, y: 0, width: 320, height: 900 });
       }
       if (this.classList.contains("prc-PageLayout-Pane-AyzHK")) {
@@ -407,8 +448,8 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     const root = document.querySelector(".ghcm-root") as HTMLElement;
     expect(root.classList.contains("is-floating")).toBe(false);
     expect(root.style.getPropertyValue("--ghcm-panel-top")).toBe("");
-    expect(root.style.getPropertyValue("--ghcm-panel-height")).toBe("");
-    expect(root.style.getPropertyValue("--ghcm-panel-max-height")).toBe("");
+    expect(root.style.getPropertyValue("--ghcm-panel-height")).toBe("360px");
+    expect(root.style.getPropertyValue("--ghcm-panel-max-height")).toBe("802px");
 
     rowTop = 5;
     document.dispatchEvent(new Event("scroll"));
@@ -620,9 +661,10 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     expect(document.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(2);
   });
 
-  it("embeds collapsed contents in the markdown on mobile screens", () => {
+  it("embeds collapsed contents when the native sidebar is hidden on mobile", () => {
     setViewportWidth(390);
     document.body.innerHTML = githubReadmePageFixture;
+    (document.querySelector(".prc-PageLayout-PaneWrapper-pHPop") as HTMLElement).hidden = true;
 
     app = new GitHubCollapseMarkdownApp();
     app.start();
@@ -644,6 +686,7 @@ describe("GitHubCollapseMarkdownApp integration", () => {
   it("keeps embedded mobile contents open after jumping from the outline", () => {
     setViewportWidth(390);
     document.body.innerHTML = githubReadmePageFixture;
+    (document.querySelector(".prc-PageLayout-PaneWrapper-pHPop") as HTMLElement).hidden = true;
 
     app = new GitHubCollapseMarkdownApp();
     app.start();
@@ -739,17 +782,19 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     const root = document.querySelector(".ghcm-root") as HTMLElement;
     const toggle = document.querySelector(".ghcm-heading-toggle");
 
-    for (const width of [390, 1400, 390, 1400]) {
+    const sidebar = document.querySelector<HTMLElement>(".prc-PageLayout-PaneWrapper-pHPop")!;
+    for (const width of [390, 1024, 1400, 390, 1400]) {
+      sidebar.hidden = width === 390;
       setViewportWidth(width);
       window.dispatchEvent(new Event("resize"));
 
-      expect(root.classList.contains(width < 1180 ? "is-inline" : "is-docked")).toBe(true);
+      expect(root.classList.contains(sidebar.hidden ? "is-inline" : "is-docked")).toBe(true);
       expect(document.querySelector(".ghcm-root")).toBe(root);
       expect(document.querySelector(".ghcm-heading-toggle")).toBe(toggle);
       expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
       expect(document.querySelectorAll(".ghcm-panel")).toHaveLength(1);
       expect(document.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(6);
-      expect(document.querySelectorAll(".ghcm-dock-row")).toHaveLength(width < 1180 ? 0 : 1);
+      expect(document.querySelectorAll(".ghcm-dock-row")).toHaveLength(sidebar.hidden ? 0 : 1);
     }
   });
 });
