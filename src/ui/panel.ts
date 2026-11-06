@@ -1,5 +1,6 @@
 import { PanelLayout } from "./panel-layout";
-import { createPanelDom } from "./panel-dom";
+import { createPanelDom, updatePanelDom } from "./panel-dom";
+import { PanelActions } from "./panel-actions";
 import { PanelFocus } from "./panel-focus";
 import { PanelDrag } from "./panel-drag";
 import { PanelOutlineView, type PanelRenderState } from "./panel-outline";
@@ -17,6 +18,9 @@ export class PanelUI {
   private readonly abortController = new AbortController();
   private readonly dom = createPanelDom();
   private readonly focus = new PanelFocus(this.dom);
+  private readonly actions = new PanelActions({
+    details: this.dom.actionsDetails, trigger: this.dom.actionsTrigger, menu: this.dom.actionsMenu
+  });
   private readonly drag = new PanelDrag({ panel: this.dom.panel, handle: this.dom.dragHandle });
   private readonly layout: PanelLayout;
   private readonly outlineView: PanelOutlineView;
@@ -49,6 +53,7 @@ export class PanelUI {
     document.body.append(this.dom.root);
     this.layout.bind(this.abortController.signal);
     this.drag.bind(this.abortController.signal);
+    this.actions.bind(this.abortController.signal);
     this.bindEvents();
     this.handleViewportChange(true);
   }
@@ -56,6 +61,7 @@ export class PanelUI {
   destroy(): void {
     this.abortController.abort();
     this.focus.destroy();
+    this.actions.destroy();
     this.drag.destroy();
     this.layout.destroy();
     this.outlineView.destroy();
@@ -123,7 +129,7 @@ export class PanelUI {
   }
 
   private handleKeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && this.open && this.layout.getPlacement() === "overlay") {
+    if (!event.defaultPrevented && event.key === "Escape" && this.open && this.layout.getPlacement() === "overlay") {
       event.preventDefault();
       this.setOpen(false);
     }
@@ -152,33 +158,11 @@ export class PanelUI {
       this.open = placement === "docked";
       this.layout.sync(this.desktop, this.open);
     }
-    const docked = placement === "docked";
-    const inline = placement === "inline";
-    const overlay = placement === "overlay";
-
-    this.dom.root.classList.toggle("is-desktop", this.desktop);
-    this.dom.root.classList.toggle("is-docked", docked);
-    this.dom.root.classList.toggle("is-inline", inline);
-    this.dom.root.classList.toggle("is-overlay", overlay);
-    this.dom.trigger.classList.toggle("is-hidden", this.open);
-    this.dom.panel.classList.toggle("is-open", this.open);
-    this.dom.panel.hidden = !this.open;
-    if (overlay) {
-      this.dom.panel.setAttribute("role", "dialog");
-      this.dom.trigger.setAttribute("aria-haspopup", "dialog");
-      this.dom.dragHandle.setAttribute("aria-label", "Move contents panel with arrow keys; hold Shift to move faster");
-      this.dom.dragHandle.setAttribute("role", "group");
-    } else {
-      this.dom.panel.removeAttribute("role");
-      this.dom.trigger.removeAttribute("aria-haspopup");
-      this.dom.dragHandle.removeAttribute("aria-label");
-      this.dom.dragHandle.removeAttribute("role");
+    if (!this.open || placement !== previousPlacement) {
+      this.actions.close();
     }
-    this.dom.dragHandle.tabIndex = overlay ? 0 : -1;
-    this.dom.closeButton.textContent = overlay ? "Close" : "Hide";
-    this.dom.closeButton.classList.toggle("is-hidden", !this.open);
-    this.dom.trigger.setAttribute("aria-expanded", String(this.open));
+    updatePanelDom(this.dom, placement, this.open);
     this.focus.sync({ open: this.open, moveFocus, previousFocus });
-    this.drag.sync(overlay && this.open);
+    this.drag.sync(placement === "overlay" && this.open);
   }
 }

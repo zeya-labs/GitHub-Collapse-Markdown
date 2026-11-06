@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        GitHub Collapse Markdown
-// @version     5.2.0
+// @version     5.2.1
 // @description GitHub Markdown 标题折叠脚本，支持大纲、状态记忆与现代 GitHub 页面
 // @license     MIT
 // @author      Xyea
@@ -697,17 +697,10 @@
     --ghcm-ink-soft: var(--fgColor-muted, var(--color-fg-muted, #59636e));
     --ghcm-ink-muted: var(--ghcm-ink-soft);
     --ghcm-line: var(--borderColor-default, var(--color-border-default, #d0d7de));
-    --ghcm-line-muted: var(--borderColor-muted, var(--color-border-muted, #d8dee4));
     --ghcm-surface: var(--bgColor-default, var(--color-canvas-default, #ffffff));
     --ghcm-surface-subtle: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
     --ghcm-surface-accent: var(--bgColor-accent-muted, var(--color-accent-subtle, rgba(9, 105, 218, 0.08)));
     --ghcm-accent: var(--fgColor-accent, var(--color-accent-fg, #0969da));
-    --ghcm-h1: var(--ghcm-ink);
-    --ghcm-h2: var(--ghcm-ink);
-    --ghcm-h3: var(--ghcm-ink);
-    --ghcm-h4: var(--ghcm-ink-soft);
-    --ghcm-h5: var(--ghcm-ink-soft);
-    --ghcm-h6: var(--ghcm-ink-soft);
   }
 
   .ghcm-root,
@@ -721,18 +714,13 @@
     font-family: inherit;
   }
 
-  .ghcm-root :is(.ghcm-trigger, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
+  .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
     outline: 2px solid var(--ghcm-accent);
     outline-offset: 2px;
   }
 
   .ghcm-root .ghcm-outline-link:focus-visible {
     outline-offset: -2px;
-  }
-
-  .ghcm-cell {
-    display: block;
-    width: 100%;
   }
 
   .ghcm-dock-row,
@@ -773,6 +761,7 @@
   .ghcm-heading-block {
     position: relative;
     cursor: pointer;
+    scroll-margin-top: 120px;
   }
 
   .ghcm-heading-block--wrapped {
@@ -782,96 +771,70 @@
   .ghcm-heading-inline {
     display: flex;
     align-items: center;
-    gap: 0.42em;
-  }
-
-  .ghcm-visible-heading {
-    scroll-margin-top: 120px;
-  }
-
-  .ghcm-collapsed > h1,
-  .ghcm-collapsed > h2,
-  .ghcm-collapsed > h3,
-  .ghcm-collapsed > h4,
-  .ghcm-collapsed > h5,
-  .ghcm-collapsed > h6,
-  .ghcm-collapsed .heading-element,
-  .ghcm-collapsed.ghcm-heading-inline {
-    opacity: 0.84;
-  }
-
-  .ghcm-heading-block--wrapped .heading-element {
-    display: flex;
-    align-items: center;
-    gap: 0.32em;
+    gap: 6px;
     min-width: 0;
   }
 
   .ghcm-heading-toggle {
     appearance: none;
     box-sizing: border-box;
+    position: relative;
     flex: 0 0 auto;
-    width: 1.18em;
-    height: 1.18em;
+    width: 20px;
+    height: 20px;
     border: none;
+    border-radius: 4px;
     background: transparent;
-    color: var(--ghcm-toggle-color, var(--ghcm-h4));
+    color: inherit;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-family: inherit;
-    font-size: 1em;
-    font-weight: 700;
+    font: inherit;
     line-height: 1;
-    letter-spacing: -0.04em;
     cursor: pointer;
-    transition: transform 140ms ease, color 140ms ease, opacity 140ms ease;
-    opacity: 0.96;
-    margin-right: 0.18em;
+    opacity: 0.6;
+    transition: opacity 140ms ease;
+    margin: 0;
     padding: 0;
-    vertical-align: middle;
   }
 
-  .ghcm-heading-block--wrapped > h1,
-  h1.ghcm-heading-inline {
-    --ghcm-toggle-color: var(--ghcm-h1);
+  .ghcm-heading-toggle::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 140ms ease;
   }
 
-  .ghcm-heading-block--wrapped > h2,
-  h2.ghcm-heading-inline {
-    --ghcm-toggle-color: var(--ghcm-h2);
+  .ghcm-heading-toggle[aria-expanded="true"]::before {
+    transform: rotate(45deg);
   }
 
-  .ghcm-heading-block--wrapped > h3,
-  h3.ghcm-heading-inline {
-    --ghcm-toggle-color: var(--ghcm-h3);
+  .ghcm-heading-toggle:focus-visible {
+    outline: 2px solid var(--fgColor-accent, var(--color-accent-fg, #0969da));
+    outline-offset: 2px;
   }
 
-  .ghcm-heading-block--wrapped > h4,
-  h4.ghcm-heading-inline {
-    --ghcm-toggle-color: var(--ghcm-h4);
-  }
-
-  .ghcm-heading-block--wrapped > h5,
-  h5.ghcm-heading-inline {
-    --ghcm-toggle-color: var(--ghcm-h5);
-  }
-
-  .ghcm-heading-block--wrapped > h6,
-  h6.ghcm-heading-inline {
-    --ghcm-toggle-color: var(--ghcm-h6);
-  }
-
-  .ghcm-heading-block:hover > .ghcm-heading-toggle,
-  .ghcm-heading-block:hover .heading-element > .ghcm-heading-toggle,
-  .ghcm-heading-toggle:hover {
-    color: var(--ghcm-ink);
+  .ghcm-heading-block:hover .ghcm-heading-toggle,
+  .ghcm-heading-toggle:focus-visible {
     opacity: 1;
   }
 
-  .ghcm-heading-inline > .ghcm-heading-toggle:hover,
-  .ghcm-heading-block--wrapped .heading-element > .ghcm-heading-toggle:hover {
-    transform: translateY(-1px);
+  @media (pointer: coarse) {
+    .ghcm-heading-toggle::after {
+      content: "";
+      position: absolute;
+      inset: -6px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ghcm-heading-toggle,
+    .ghcm-heading-toggle::before {
+      transition: none;
+    }
   }
 
   .ghcm-section-hidden,
@@ -927,47 +890,21 @@
   }
 
   .ghcm-outline-link {
-    --ghcm-level-accent: var(--ghcm-h4);
     appearance: none;
-    display: grid;
+    display: flex;
     flex-shrink: 0;
-    grid-template-columns: 2px minmax(0, 1fr);
-    align-items: start;
-    gap: var(--ghcm-space-2);
+    align-items: center;
     width: 100%;
+    min-height: 28px;
     border: none;
     background: transparent;
     border-radius: 4px;
     margin: 0;
-    padding: var(--ghcm-space-1) var(--ghcm-space-1) var(--ghcm-space-1)
-      calc(var(--ghcm-space-1) + (var(--ghcm-depth, 0) * var(--ghcm-space-3)));
+    padding: var(--ghcm-space-1) var(--ghcm-space-2) var(--ghcm-space-1)
+      calc(var(--ghcm-space-2) + (var(--ghcm-depth, 0) * var(--ghcm-space-3)));
     cursor: pointer;
     text-align: left;
     transition: background-color 120ms ease, opacity 120ms ease;
-  }
-
-  .ghcm-outline-link[data-level="1"] {
-    --ghcm-level-accent: var(--ghcm-h1);
-  }
-
-  .ghcm-outline-link[data-level="2"] {
-    --ghcm-level-accent: var(--ghcm-h2);
-  }
-
-  .ghcm-outline-link[data-level="3"] {
-    --ghcm-level-accent: var(--ghcm-h3);
-  }
-
-  .ghcm-outline-link[data-level="4"] {
-    --ghcm-level-accent: var(--ghcm-h4);
-  }
-
-  .ghcm-outline-link[data-level="5"] {
-    --ghcm-level-accent: var(--ghcm-h5);
-  }
-
-  .ghcm-outline-link[data-level="6"] {
-    --ghcm-level-accent: var(--ghcm-h6);
   }
 
   .ghcm-outline-link:hover {
@@ -976,33 +913,18 @@
 
   .ghcm-outline-link.is-active {
     background: var(--ghcm-surface-accent);
+    box-shadow: inset 2px 0 var(--ghcm-accent);
   }
 
   .ghcm-outline-link.is-muted {
     opacity: 0.62;
   }
 
-  .ghcm-outline-rail {
-    display: block;
-    min-height: 1.3em;
-    border-radius: 999px;
-    background: var(--ghcm-line);
-    transition: background-color 120ms ease, opacity 120ms ease;
-  }
-
-  .ghcm-outline-link.is-collapsed .ghcm-outline-rail {
-    background: var(--ghcm-line-muted);
-  }
-
-  .ghcm-outline-link.is-active .ghcm-outline-rail {
-    background: var(--ghcm-level-accent);
-  }
-
   .ghcm-outline-label {
     display: block;
     min-width: 0;
     color: var(--ghcm-ink-soft);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 400;
     line-height: 1.5;
     overflow-wrap: anywhere;
@@ -1047,16 +969,19 @@
   }
 
   .ghcm-trigger::before {
-    content: "▸";
-    font-size: 12px;
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
   }
 
   .ghcm-trigger:hover {
     color: var(--ghcm-accent);
   }
 
-  .ghcm-trigger.is-hidden,
-  .ghcm-inline-action.is-hidden {
+  .ghcm-trigger.is-hidden {
     display: none;
   }
 
@@ -1070,7 +995,7 @@
     margin: 0;
     border: 0;
     padding: 0;
-    overflow: hidden;
+    overflow: visible;
     background: transparent;
     box-shadow: none;
   }
@@ -1117,17 +1042,9 @@
     background: var(--ghcm-surface);
   }
 
-  .ghcm-sidebar-shell {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
   .ghcm-sidebar-header {
     display: flex;
     flex: 0 0 auto;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--ghcm-space-1) var(--ghcm-space-2);
@@ -1143,6 +1060,7 @@
 
   .ghcm-sidebar-kicker {
     display: inline-flex;
+    flex: 1 1 auto;
     align-items: center;
     min-width: 0;
     margin: 0;
@@ -1168,41 +1086,102 @@
 
   .ghcm-sidebar-tools {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
-    flex-wrap: wrap;
-    gap: var(--ghcm-space-2);
+    gap: var(--ghcm-space-1);
   }
 
   .ghcm-inline-action {
     appearance: none;
     margin: 0;
     border: 0;
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 0;
     background: transparent;
-    color: var(--ghcm-accent);
-    font-size: 12px;
-    font-weight: 500;
+    color: var(--ghcm-ink);
+    font: inherit;
+    font-size: 13px;
     line-height: 20px;
     cursor: pointer;
-    transition: color 120ms ease;
+    transition: background-color 120ms ease;
   }
 
-  .ghcm-inline-action:hover {
-    color: var(--ghcm-ink);
-    text-decoration: underline;
-  }
-
-  .ghcm-sidebar-outline {
-    display: flex;
-    flex: 1 1 auto;
-    min-height: 0;
+  .ghcm-root .ghcm-actions {
+    position: relative;
     margin: 0;
     padding: 0;
   }
 
-  .ghcm-root.is-overlay .ghcm-sidebar-outline {
-    padding: var(--ghcm-space-2);
+  .ghcm-root .ghcm-actions-trigger,
+  .ghcm-root .ghcm-close-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    border: 0;
+    border-radius: 6px;
+    padding: 0;
+    background: transparent;
+    color: var(--ghcm-ink-soft);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .ghcm-actions-trigger::-webkit-details-marker {
+    display: none;
+  }
+
+  .ghcm-actions-trigger svg,
+  .ghcm-close-action svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+  }
+
+  .ghcm-actions-trigger:hover,
+  .ghcm-close-action:hover,
+  .ghcm-actions[open] > .ghcm-actions-trigger,
+  .ghcm-inline-action:hover {
+    background: var(--ghcm-surface-subtle);
+  }
+
+  .ghcm-actions-menu {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: calc(100% + var(--ghcm-space-1));
+    right: 0;
+    z-index: 3;
+    width: max-content;
+    min-width: 160px;
+    margin: 0;
+    border: 1px solid var(--ghcm-line);
+    border-radius: 6px;
+    padding: var(--ghcm-space-1);
+    background: var(--ghcm-surface);
+    box-shadow: var(--shadow-floating-small, 0 4px 12px rgba(31, 35, 40, 0.12));
+  }
+
+  .ghcm-actions.is-above .ghcm-actions-menu {
+    top: auto;
+    bottom: calc(100% + var(--ghcm-space-1));
+  }
+
+  .ghcm-actions-menu .ghcm-inline-action {
+    width: 100%;
+    padding: var(--ghcm-space-1) var(--ghcm-space-2);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .ghcm-root.is-overlay .ghcm-outline {
+    margin: var(--ghcm-space-2);
+  }
+
+  .ghcm-actions-menu .ghcm-inline-action:focus-visible {
+    outline-offset: -2px;
   }
 `;
 
@@ -1210,26 +1189,13 @@
   var responsiveStyles = `
   @media (max-width: 1179px), (pointer: coarse) {
     .ghcm-root .ghcm-trigger,
+    .ghcm-root .ghcm-actions-trigger,
+    .ghcm-root .ghcm-close-action,
     .ghcm-root .ghcm-inline-action,
     .ghcm-root .ghcm-outline-link,
     .ghcm-root.is-overlay .ghcm-drag-handle {
       min-width: 44px;
       min-height: 44px;
-    }
-
-    .ghcm-root .ghcm-inline-action {
-      padding: var(--ghcm-space-1) var(--ghcm-space-2);
-    }
-
-    .ghcm-root .ghcm-outline-link {
-      align-items: center;
-    }
-  }
-
-  @media (max-width: 599px) {
-    .ghcm-sidebar-header {
-      align-items: flex-start;
-      flex-direction: column;
     }
   }
 `;
@@ -1385,12 +1351,9 @@
     return button;
   }
   function syncToggleButton(button, text, collapsed) {
-    const symbol = collapsed ? "▸" : "▾";
-    if (button.textContent !== symbol) {
-      button.textContent = symbol;
-    }
-    button.title = text;
-    button.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} section: ${text}`);
+    const label = `${collapsed ? "Expand" : "Collapse"} section: ${text}`;
+    button.title = label;
+    button.setAttribute("aria-label", label);
     button.setAttribute("aria-expanded", String(!collapsed));
   }
   var HeadingControls = class {
@@ -1412,8 +1375,6 @@
         }
         binding.blockEl.classList.toggle("ghcm-hidden-by-parent", snapshot.hiddenByAncestor);
         binding.blockEl.classList.toggle("ghcm-collapsed", snapshot.collapsed);
-        binding.blockEl.classList.toggle("ghcm-visible-heading", !snapshot.hiddenByAncestor);
-        binding.blockEl.setAttribute("aria-expanded", String(!snapshot.collapsed));
         const toggle = this.toggleElements.get(snapshot.key);
         if (toggle) {
           syncToggleButton(toggle, snapshot.text, snapshot.collapsed);
@@ -1442,9 +1403,12 @@
         if (!binding) {
           continue;
         }
-        binding.blockEl.classList.remove("ghcm-heading-block", "ghcm-heading-block--wrapped");
-        binding.blockEl.classList.remove("ghcm-hidden-by-parent", "ghcm-collapsed", "ghcm-visible-heading");
-        binding.blockEl.removeAttribute("aria-expanded");
+        binding.blockEl.classList.remove(
+          "ghcm-heading-block",
+          "ghcm-heading-block--wrapped",
+          "ghcm-hidden-by-parent",
+          "ghcm-collapsed"
+        );
         binding.headingEl.classList.remove("ghcm-heading-inline");
         binding.sectionEls.forEach((element) => element.classList.remove("ghcm-section-hidden"));
       }
@@ -1456,10 +1420,9 @@
       }
       const wrapped = binding.blockEl !== binding.headingEl;
       binding.blockEl.classList.add("ghcm-heading-block");
+      binding.headingEl.classList.add("ghcm-heading-inline");
       if (wrapped) {
         binding.blockEl.classList.add("ghcm-heading-block--wrapped");
-      } else {
-        binding.headingEl.classList.add("ghcm-heading-inline");
       }
       const button = createToggleButton(heading.text, this.engine.isCollapsed(heading.key));
       this.toggleElements.set(heading.key, button);
@@ -1774,8 +1737,6 @@
     dockCell.className = "ghcm-dock-cell BorderGrid-cell";
     const root = document.createElement("div");
     root.className = "ghcm-root";
-    const cell = document.createElement("div");
-    cell.className = "ghcm-cell";
     const trigger = createButton("ghcm-trigger", "Contents", "Toggle contents");
     trigger.setAttribute("aria-controls", "ghcm-contents-panel");
     const panel = document.createElement("aside");
@@ -1787,12 +1748,22 @@
     collapseAllButton.dataset.action = "collapse-all";
     const expandAllButton = createButton("ghcm-inline-action", "Expand all");
     expandAllButton.dataset.action = "expand-all";
-    const closeButton = createButton("ghcm-inline-action ghcm-close-action", "Hide");
+    const closeButton = createButton("ghcm-close-action", "", "Hide contents");
+    closeButton.append(createIcon("M4 4l8 8M12 4l-8 8"));
+    const actionsDetails = document.createElement("details");
+    actionsDetails.className = "ghcm-actions";
+    const actionsTrigger = document.createElement("summary");
+    actionsTrigger.className = "ghcm-actions-trigger";
+    actionsTrigger.setAttribute("aria-label", "Contents actions");
+    actionsTrigger.title = "Contents actions";
+    actionsTrigger.append(createIcon("M3 8h.01M8 8h.01M13 8h.01"));
+    const actionsMenu = document.createElement("div");
+    actionsMenu.className = "ghcm-actions-menu";
+    actionsMenu.append(collapseAllButton, expandAllButton);
+    actionsDetails.append(actionsTrigger, actionsMenu);
     const outline = document.createElement("nav");
     outline.className = "ghcm-outline";
     outline.setAttribute("aria-label", "Page contents");
-    const shell = document.createElement("div");
-    shell.className = "ghcm-sidebar-shell";
     const header = document.createElement("header");
     header.className = "ghcm-sidebar-header";
     const kicker = document.createElement("div");
@@ -1800,18 +1771,52 @@
     kicker.textContent = "Contents";
     const toolbar = document.createElement("div");
     toolbar.className = "ghcm-sidebar-tools";
-    toolbar.append(collapseAllButton, expandAllButton, closeButton);
+    toolbar.append(actionsDetails, closeButton);
     header.append(kicker, toolbar);
-    const outlineShell = document.createElement("div");
-    outlineShell.className = "ghcm-sidebar-outline";
-    outlineShell.append(outline);
-    shell.append(header, outlineShell);
-    panel.append(shell);
-    cell.append(trigger, panel);
-    root.append(cell);
+    panel.append(header, outline);
+    root.append(trigger, panel);
     dockCell.append(root);
     dockRow.append(dockCell);
-    return { dockRow, dockCell, root, trigger, dragHandle: kicker, panel, outline, collapseAllButton, expandAllButton, closeButton };
+    return {
+      dockRow,
+      dockCell,
+      root,
+      trigger,
+      dragHandle: kicker,
+      panel,
+      outline,
+      collapseAllButton,
+      expandAllButton,
+      closeButton,
+      actionsDetails,
+      actionsTrigger,
+      actionsMenu
+    };
+  }
+  function updatePanelDom(dom, placement, open) {
+    const floating = placement === "overlay";
+    for (const kind of ["docked", "inline", "overlay"]) {
+      dom.root.classList.toggle(`is-${kind}`, placement === kind);
+    }
+    dom.trigger.classList.toggle("is-hidden", open);
+    dom.trigger.setAttribute("aria-expanded", String(open));
+    dom.panel.classList.toggle("is-open", open);
+    dom.panel.hidden = !open;
+    dom.dragHandle.tabIndex = floating ? 0 : -1;
+    if (floating) {
+      dom.panel.setAttribute("role", "dialog");
+      dom.trigger.setAttribute("aria-haspopup", "dialog");
+      dom.dragHandle.setAttribute("aria-label", "Move contents panel with arrow keys; hold Shift to move faster");
+      dom.dragHandle.setAttribute("role", "group");
+    } else {
+      dom.panel.removeAttribute("role");
+      dom.trigger.removeAttribute("aria-haspopup");
+      dom.dragHandle.removeAttribute("aria-label");
+      dom.dragHandle.removeAttribute("role");
+    }
+    const closeLabel = floating ? "Close contents" : "Hide contents";
+    dom.closeButton.setAttribute("aria-label", closeLabel);
+    dom.closeButton.title = closeLabel;
   }
   function createButton(className, textContent, ariaLabel) {
     const button = document.createElement("button");
@@ -1820,9 +1825,93 @@
     button.textContent = textContent;
     if (ariaLabel) {
       button.setAttribute("aria-label", ariaLabel);
+      button.title = ariaLabel;
     }
     return button;
   }
+  function createIcon(pathData) {
+    const namespace = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(namespace, "svg");
+    icon.setAttribute("viewBox", "0 0 16 16");
+    icon.setAttribute("width", "16");
+    icon.setAttribute("height", "16");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "1.75");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("aria-hidden", "true");
+    icon.setAttribute("focusable", "false");
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("d", pathData);
+    icon.append(path);
+    return icon;
+  }
+
+  // src/ui/panel-actions.ts
+  var PanelActions = class {
+    constructor(elements) {
+      this.elements = elements;
+      __publicField(this, "abortController", new AbortController());
+      __publicField(this, "bound", false);
+    }
+    bind(signal) {
+      if (this.bound || this.abortController.signal.aborted) {
+        return;
+      }
+      if (signal.aborted) {
+        this.destroy();
+        return;
+      }
+      this.bound = true;
+      const options = { signal: this.abortController.signal };
+      this.elements.details.addEventListener("toggle", () => this.placeMenu(), options);
+      this.elements.menu.addEventListener("click", (event) => {
+        if (event.target instanceof Element && event.target.closest("button[data-action]")) {
+          this.close({ restoreFocus: true });
+        }
+      }, options);
+      document.addEventListener("pointerdown", (event) => {
+        if (event.target instanceof Node && !this.elements.details.contains(event.target)) {
+          this.close();
+        }
+      }, { ...options, capture: true });
+      document.addEventListener("keydown", (event) => {
+        if (this.elements.details.open && event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          this.close({ restoreFocus: true });
+        }
+      }, { ...options, capture: true });
+      window.addEventListener("resize", () => this.close(), options);
+      document.addEventListener("scroll", () => this.close(), { ...options, capture: true });
+      signal.addEventListener("abort", () => this.destroy(), { ...options, once: true });
+      this.placeMenu();
+    }
+    close({ restoreFocus = false } = {}) {
+      const wasOpen = this.elements.details.open;
+      this.elements.details.open = false;
+      this.elements.details.classList.remove("is-above");
+      if (wasOpen && restoreFocus) {
+        this.elements.trigger.focus({ preventScroll: true });
+      }
+    }
+    destroy() {
+      this.abortController.abort();
+      this.close();
+    }
+    placeMenu() {
+      const { details, trigger, menu } = this.elements;
+      details.classList.remove("is-above");
+      if (!details.open) {
+        return;
+      }
+      const menuRect = menu.getBoundingClientRect();
+      const triggerRect = trigger.getBoundingClientRect();
+      const below = window.innerHeight - triggerRect.bottom;
+      const above = triggerRect.top;
+      details.classList.toggle("is-above", menuRect.bottom > window.innerHeight - 8 && above > below);
+    }
+  };
 
   // src/ui/panel-focus.ts
   var PanelFocus = class {
@@ -1837,7 +1926,7 @@
       if (open && !wasOpen) {
         this.returnTarget = previousFocus instanceof HTMLElement ? previousFocus : null;
         if (moveFocus) {
-          (this.dom.panel.querySelector("button:not(:disabled)") ?? this.dom.panel).focus({ preventScroll: true });
+          this.dom.actionsTrigger.focus({ preventScroll: true });
         }
         return;
       }
@@ -2114,7 +2203,6 @@
         }
         item.title = heading.text;
         item.classList.toggle("is-muted", heading.hiddenByAncestor);
-        item.classList.toggle("is-collapsed", heading.collapsed);
       });
     }
     syncActiveHeading(activeHeadingKey) {
@@ -2138,15 +2226,11 @@
     item.type = "button";
     item.className = "ghcm-outline-link";
     item.dataset.key = heading.key;
-    item.dataset.level = String(heading.level);
     item.style.setProperty("--ghcm-depth", String(depth));
-    const rail = document.createElement("span");
-    rail.className = "ghcm-outline-rail";
-    rail.setAttribute("aria-hidden", "true");
     const label = document.createElement("span");
     label.className = "ghcm-outline-label";
     label.textContent = heading.text;
-    item.append(rail, label);
+    item.append(label);
     return item;
   }
 
@@ -2158,6 +2242,11 @@
       __publicField(this, "abortController", new AbortController());
       __publicField(this, "dom", createPanelDom());
       __publicField(this, "focus", new PanelFocus(this.dom));
+      __publicField(this, "actions", new PanelActions({
+        details: this.dom.actionsDetails,
+        trigger: this.dom.actionsTrigger,
+        menu: this.dom.actionsMenu
+      }));
       __publicField(this, "drag", new PanelDrag({ panel: this.dom.panel, handle: this.dom.dragHandle }));
       __publicField(this, "layout");
       __publicField(this, "outlineView");
@@ -2186,12 +2275,14 @@
       document.body.append(this.dom.root);
       this.layout.bind(this.abortController.signal);
       this.drag.bind(this.abortController.signal);
+      this.actions.bind(this.abortController.signal);
       this.bindEvents();
       this.handleViewportChange(true);
     }
     destroy() {
       this.abortController.abort();
       this.focus.destroy();
+      this.actions.destroy();
       this.drag.destroy();
       this.layout.destroy();
       this.outlineView.destroy();
@@ -2248,7 +2339,7 @@
       }
     }
     handleKeydown(event) {
-      if (event.key === "Escape" && this.open && this.layout.getPlacement() === "overlay") {
+      if (!event.defaultPrevented && event.key === "Escape" && this.open && this.layout.getPlacement() === "overlay") {
         event.preventDefault();
         this.setOpen(false);
       }
@@ -2274,33 +2365,12 @@
         this.open = placement === "docked";
         this.layout.sync(this.desktop, this.open);
       }
-      const docked = placement === "docked";
-      const inline = placement === "inline";
-      const overlay = placement === "overlay";
-      this.dom.root.classList.toggle("is-desktop", this.desktop);
-      this.dom.root.classList.toggle("is-docked", docked);
-      this.dom.root.classList.toggle("is-inline", inline);
-      this.dom.root.classList.toggle("is-overlay", overlay);
-      this.dom.trigger.classList.toggle("is-hidden", this.open);
-      this.dom.panel.classList.toggle("is-open", this.open);
-      this.dom.panel.hidden = !this.open;
-      if (overlay) {
-        this.dom.panel.setAttribute("role", "dialog");
-        this.dom.trigger.setAttribute("aria-haspopup", "dialog");
-        this.dom.dragHandle.setAttribute("aria-label", "Move contents panel with arrow keys; hold Shift to move faster");
-        this.dom.dragHandle.setAttribute("role", "group");
-      } else {
-        this.dom.panel.removeAttribute("role");
-        this.dom.trigger.removeAttribute("aria-haspopup");
-        this.dom.dragHandle.removeAttribute("aria-label");
-        this.dom.dragHandle.removeAttribute("role");
+      if (!this.open || placement !== previousPlacement) {
+        this.actions.close();
       }
-      this.dom.dragHandle.tabIndex = overlay ? 0 : -1;
-      this.dom.closeButton.textContent = overlay ? "Close" : "Hide";
-      this.dom.closeButton.classList.toggle("is-hidden", !this.open);
-      this.dom.trigger.setAttribute("aria-expanded", String(this.open));
+      updatePanelDom(this.dom, placement, this.open);
       this.focus.sync({ open: this.open, moveFocus, previousFocus });
-      this.drag.sync(overlay && this.open);
+      this.drag.sync(placement === "overlay" && this.open);
     }
   };
 

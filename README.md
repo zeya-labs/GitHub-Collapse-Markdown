@@ -1,6 +1,6 @@
 # GitHub Collapse Markdown
 
-![Version](https://img.shields.io/badge/version-5.2.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-5.2.1-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Userscript](https://img.shields.io/badge/userscript-Tampermonkey%2FViolentmonkey-orange.svg)
 
@@ -62,8 +62,9 @@ GitHub 上的长文档通常有这些问题：
 - 点击整个标题行：折叠 / 展开当前章节
 - `Shift + 点击标题`：批量折叠 / 展开同级章节
 - 打开侧边面板：浏览大纲并跳转到指定标题
-- `Collapse all`：折叠全部章节
-- `Expand all`：展开全部章节
+- 点击目录标题旁的 `⋯` 打开操作菜单
+  - `Collapse all`：折叠全部章节
+  - `Expand all`：展开全部章节
 
 ## 快捷键
 

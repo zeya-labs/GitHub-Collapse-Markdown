@@ -37,7 +37,7 @@ describe("embedded and floating contents panels", () => {
     trigger.click();
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
     expect(dialog.hasAttribute("aria-modal")).toBe(false);
-    expect(document.activeElement).toBe(button('[data-action="collapse-all"]'));
+    expect(document.activeElement).toBe(document.querySelector(".ghcm-actions-trigger"));
     expect(trigger.getAttribute("aria-controls")).toBe(dialog.id);
     expect(document.querySelector("main")?.hasAttribute("inert")).toBe(false);
     expect(document.querySelector<HTMLElement>(".ghcm-drag-handle")?.tabIndex).toBe(0);
@@ -50,7 +50,7 @@ describe("embedded and floating contents panels", () => {
 
   it("allows keyboard and page interaction while the floating panel is open", () => {
     panel.setOpen(true);
-    const first = button('[data-action="collapse-all"]');
+    const first = document.querySelector<HTMLElement>(".ghcm-actions-trigger")!;
     first.focus();
     const tab = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
     first.dispatchEvent(tab);
@@ -66,6 +66,44 @@ describe("embedded and floating contents panels", () => {
     panel.setOpen(true);
     panel.setOpen(false);
     expect(document.activeElement).toBe(pageButton);
+  });
+
+  it("keeps bulk actions in a disclosure and returns focus after an action", () => {
+    panel.setOpen(true);
+    const details = document.querySelector<HTMLDetailsElement>(".ghcm-actions")!;
+    const summary = document.querySelector<HTMLElement>(".ghcm-actions-trigger")!;
+    expect(details.open).toBe(false);
+
+    summary.click();
+    expect(details.open).toBe(true);
+    button('[data-action="collapse-all"]').click();
+
+    expect(details.open).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    expect(panel.isOpen()).toBe(true);
+  });
+
+  it("closes the actions first when Escape is pressed inside the floating panel", () => {
+    panel.setOpen(true);
+    const details = document.querySelector<HTMLDetailsElement>(".ghcm-actions")!;
+    const summary = document.querySelector<HTMLElement>(".ghcm-actions-trigger")!;
+    summary.click();
+    summary.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(details.open).toBe(false);
+    expect(panel.isOpen()).toBe(true);
+
+    summary.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(panel.isOpen()).toBe(false);
+  });
+
+  it("resets the actions disclosure when the panel is hidden", () => {
+    panel.setOpen(true);
+    const details = document.querySelector<HTMLDetailsElement>(".ghcm-actions")!;
+    document.querySelector<HTMLElement>(".ghcm-actions-trigger")!.click();
+    expect(details.open).toBe(true);
+    panel.setOpen(false);
+    panel.setOpen(true);
+    expect(details.open).toBe(false);
   });
 
   it("does not steal page focus when an unused floating panel is destroyed", () => {

@@ -44,47 +44,21 @@ export const outlineStyles = `
   }
 
   .ghcm-outline-link {
-    --ghcm-level-accent: var(--ghcm-h4);
     appearance: none;
-    display: grid;
+    display: flex;
     flex-shrink: 0;
-    grid-template-columns: 2px minmax(0, 1fr);
-    align-items: start;
-    gap: var(--ghcm-space-2);
+    align-items: center;
     width: 100%;
+    min-height: 28px;
     border: none;
     background: transparent;
     border-radius: 4px;
     margin: 0;
-    padding: var(--ghcm-space-1) var(--ghcm-space-1) var(--ghcm-space-1)
-      calc(var(--ghcm-space-1) + (var(--ghcm-depth, 0) * var(--ghcm-space-3)));
+    padding: var(--ghcm-space-1) var(--ghcm-space-2) var(--ghcm-space-1)
+      calc(var(--ghcm-space-2) + (var(--ghcm-depth, 0) * var(--ghcm-space-3)));
     cursor: pointer;
     text-align: left;
     transition: background-color 120ms ease, opacity 120ms ease;
-  }
-
-  .ghcm-outline-link[data-level="1"] {
-    --ghcm-level-accent: var(--ghcm-h1);
-  }
-
-  .ghcm-outline-link[data-level="2"] {
-    --ghcm-level-accent: var(--ghcm-h2);
-  }
-
-  .ghcm-outline-link[data-level="3"] {
-    --ghcm-level-accent: var(--ghcm-h3);
-  }
-
-  .ghcm-outline-link[data-level="4"] {
-    --ghcm-level-accent: var(--ghcm-h4);
-  }
-
-  .ghcm-outline-link[data-level="5"] {
-    --ghcm-level-accent: var(--ghcm-h5);
-  }
-
-  .ghcm-outline-link[data-level="6"] {
-    --ghcm-level-accent: var(--ghcm-h6);
   }
 
   .ghcm-outline-link:hover {
@@ -93,33 +67,18 @@ export const outlineStyles = `
 
   .ghcm-outline-link.is-active {
     background: var(--ghcm-surface-accent);
+    box-shadow: inset 2px 0 var(--ghcm-accent);
   }
 
   .ghcm-outline-link.is-muted {
     opacity: 0.62;
   }
 
-  .ghcm-outline-rail {
-    display: block;
-    min-height: 1.3em;
-    border-radius: 999px;
-    background: var(--ghcm-line);
-    transition: background-color 120ms ease, opacity 120ms ease;
-  }
-
-  .ghcm-outline-link.is-collapsed .ghcm-outline-rail {
-    background: var(--ghcm-line-muted);
-  }
-
-  .ghcm-outline-link.is-active .ghcm-outline-rail {
-    background: var(--ghcm-level-accent);
-  }
-
   .ghcm-outline-label {
     display: block;
     min-width: 0;
     color: var(--ghcm-ink-soft);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 400;
     line-height: 1.5;
     overflow-wrap: anywhere;

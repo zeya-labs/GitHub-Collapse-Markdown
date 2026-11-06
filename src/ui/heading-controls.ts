@@ -12,12 +12,9 @@ function createToggleButton(text: string, collapsed: boolean): HTMLButtonElement
 }
 
 function syncToggleButton(button: HTMLButtonElement, text: string, collapsed: boolean): void {
-  const symbol = collapsed ? "▸" : "▾";
-  if (button.textContent !== symbol) {
-    button.textContent = symbol;
-  }
-  button.title = text;
-  button.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} section: ${text}`);
+  const label = `${collapsed ? "Expand" : "Collapse"} section: ${text}`;
+  button.title = label;
+  button.setAttribute("aria-label", label);
   button.setAttribute("aria-expanded", String(!collapsed));
 }
 
@@ -41,8 +38,6 @@ export class HeadingControls {
 
       binding.blockEl.classList.toggle("ghcm-hidden-by-parent", snapshot.hiddenByAncestor);
       binding.blockEl.classList.toggle("ghcm-collapsed", snapshot.collapsed);
-      binding.blockEl.classList.toggle("ghcm-visible-heading", !snapshot.hiddenByAncestor);
-      binding.blockEl.setAttribute("aria-expanded", String(!snapshot.collapsed));
 
       const toggle = this.toggleElements.get(snapshot.key);
       if (toggle) {
@@ -81,9 +76,9 @@ export class HeadingControls {
         continue;
       }
 
-      binding.blockEl.classList.remove("ghcm-heading-block", "ghcm-heading-block--wrapped");
-      binding.blockEl.classList.remove("ghcm-hidden-by-parent", "ghcm-collapsed", "ghcm-visible-heading");
-      binding.blockEl.removeAttribute("aria-expanded");
+      binding.blockEl.classList.remove(
+        "ghcm-heading-block", "ghcm-heading-block--wrapped", "ghcm-hidden-by-parent", "ghcm-collapsed"
+      );
       binding.headingEl.classList.remove("ghcm-heading-inline");
       binding.sectionEls.forEach((element) => element.classList.remove("ghcm-section-hidden"));
     }
@@ -97,10 +92,9 @@ export class HeadingControls {
 
     const wrapped = binding.blockEl !== binding.headingEl;
     binding.blockEl.classList.add("ghcm-heading-block");
+    binding.headingEl.classList.add("ghcm-heading-inline");
     if (wrapped) {
       binding.blockEl.classList.add("ghcm-heading-block--wrapped");
-    } else {
-      binding.headingEl.classList.add("ghcm-heading-inline");
     }
 
     const button = createToggleButton(heading.text, this.engine.isCollapsed(heading.key));

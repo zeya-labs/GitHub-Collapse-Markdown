@@ -41,14 +41,20 @@ describe("heading controls", () => {
     const binding = pageDocument.getBinding(pageDocument.headings[1].key)!;
     const button = binding.headingEl.querySelector<HTMLButtonElement>(".ghcm-heading-toggle")!;
 
+    expect(button.type).toBe("button");
+    expect(button.textContent).toBe("");
+    expect(binding.headingEl.textContent).toBe("Support");
     expect(button.getAttribute("aria-expanded")).toBe("true");
     expect(button.getAttribute("aria-label")).toBe("Collapse section: Support");
+    expect(button.title).toBe("Collapse section: Support");
+    expect(binding.blockEl.hasAttribute("aria-expanded")).toBe(false);
 
     button.click();
 
     expect(button.getAttribute("aria-expanded")).toBe("false");
     expect(button.getAttribute("aria-label")).toBe("Expand section: Support");
-    expect(binding.blockEl.getAttribute("aria-expanded")).toBe("false");
+    expect(button.title).toBe("Expand section: Support");
+    expect(button.textContent).toBe("");
     expect(document.querySelector("#support-copy")?.classList.contains("ghcm-section-hidden")).toBe(true);
 
     button.click();
@@ -57,7 +63,7 @@ describe("heading controls", () => {
     expect(document.querySelector("#support-copy")?.classList.contains("ghcm-section-hidden")).toBe(false);
   });
 
-  it("does not trigger content observers when synchronizing unchanged toggle text", () => {
+  it("keeps Markdown content unchanged when fold state and accessible labels change", () => {
     const { controls, engine, pageDocument } = mountControls();
     const binding = pageDocument.getBinding(pageDocument.headings[1].key)!;
     const observer = new MutationObserver(() => {});
@@ -68,11 +74,16 @@ describe("heading controls", () => {
 
     expect(observer.takeRecords()).toHaveLength(0);
 
+    engine.toggle(pageDocument.headings[1].key);
+
+    expect(observer.takeRecords()).toHaveLength(0);
+
     controls.sync(engine.getSnapshots().map((heading) => ({ ...heading, text: `${heading.text} updated` })));
 
     expect(observer.takeRecords()).toHaveLength(0);
     expect(binding.headingEl.querySelector("button")?.getAttribute("aria-label"))
-      .toBe("Collapse section: Support updated");
+      .toBe("Expand section: Support updated");
+    expect(binding.headingEl.textContent).toBe("Support");
   });
 
   it("preserves native anchors and text selection while allowing the rest of a wrapped heading to toggle", () => {

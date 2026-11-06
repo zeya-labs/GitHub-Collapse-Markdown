@@ -6,15 +6,17 @@
 
 ## Latest fixes and validation
 
-- Version 5.2.0: `npm run verify` passes the TypeScript check, 132 automated tests, and userscript build. Both userscript outputs match.
-- 24 Chromium embedding checks pass with official Primer CSS and native table/sidebar fixtures, including the downloaded Node.js README. GitHub static assets are blocked by the environment, so these local fixtures do not establish full live-site or userscript-manager compatibility.
+- Version 5.2.1: `npm run verify` passes the TypeScript check, 143 automated tests, and userscript build. Both userscript outputs match.
+- 40 Chromium layout and interaction checks pass with official Primer CSS and native table/sidebar fixtures, including the downloaded Node.js README. GitHub static assets are blocked by the environment, so these local fixtures do not establish full live-site or userscript-manager compatibility.
 - Placement prefers a usable desktop sidebar, then a safe visible Markdown container on every screen size. Inline contents starts collapsed; hidden previews, editors, navigation, and invalid insertion hosts are excluded. Other containers are tried before falling back to a floating panel.
 - All 18 Chromium floating-window checks pass, including real mouse/touch movement, keyboard steps, close/reopen position, stable height at viewport edges, resize clamping, and capture cleanup.
 - The fallback is a nonmodal, draggable window. It supports pointer and keyboard movement, viewport bounds, remembered position while the session remains mounted, and focus restoration without disabling the page.
+- The header shows Contents and two compact controls: actions and close. Bulk commands live in a native details disclosure; Escape, outside dismissal, focus return, and bottom-edge menu placement are covered.
+- Removed decorative outline rails, per-level color aliases, three layout wrappers, redundant heading state, and Unicode toggle text. Heading chevrons use the button expanded state while preserving native heading metrics.
 - Native fonts, theme colors, spacing tokens, first-heading margins, and sidebar cell padding are preserved. The panel no longer removes neighboring borders or wraps inline contents in another card.
 - Visibility and text-node changes update rendered previews and headings; sidebar visibility changes re-evaluate placement without rebuilding heading controls.
 - Fixed inline outline clipping, the heading visibility CSS cascade, cross-container collapsed ancestry, stale active-heading positions, and updated outline text reverting after an action.
-- Panel DOM, focus, dragging, placement, and geometry have separate responsibilities. Heading-button state updates are centralized and collapse ancestry reuses parsed parent relationships.
+- Panel DOM rendering, action disclosure, focus, dragging, placement, and geometry have separate responsibilities. Heading-button state updates are centralized and collapse ancestry reuses parsed parent relationships.
 
 The live DOM sources listed below were collected for the original 2026-04-17 fixtures; they are retained as historical coverage, not current live-browser validation.
 

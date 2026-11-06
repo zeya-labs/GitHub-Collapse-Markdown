@@ -122,7 +122,7 @@ describe("PanelOutlineView", () => {
 
     const firstItem = outline.querySelector(`[data-key="${headings[0].key}"]`);
 
-    const nextHeadings = [createSnapshot({ collapsed: true }), headings[1]];
+    const nextHeadings = [createSnapshot({ collapsed: true }), { ...headings[1], hiddenByAncestor: true }];
     view.render({
       headings: nextHeadings,
       activeHeadingKey: headings[0].key,
@@ -130,7 +130,7 @@ describe("PanelOutlineView", () => {
     });
 
     expect(outline.querySelector(`[data-key="${headings[0].key}"]`)).toBe(firstItem);
-    expect(firstItem?.classList.contains("is-collapsed")).toBe(true);
+    expect(outline.querySelector(`[data-key="${headings[1].key}"]`)?.classList.contains("is-muted")).toBe(true);
 
     view.destroy();
   });

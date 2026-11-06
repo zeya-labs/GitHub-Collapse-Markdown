@@ -143,7 +143,6 @@ export class PanelOutlineView {
 
       item.title = heading.text;
       item.classList.toggle("is-muted", heading.hiddenByAncestor);
-      item.classList.toggle("is-collapsed", heading.collapsed);
     });
   }
 
@@ -173,17 +172,12 @@ function createOutlineItem(heading: HeadingSnapshot, depth: number): HTMLButtonE
   item.type = "button";
   item.className = "ghcm-outline-link";
   item.dataset.key = heading.key;
-  item.dataset.level = String(heading.level);
   item.style.setProperty("--ghcm-depth", String(depth));
-
-  const rail = document.createElement("span");
-  rail.className = "ghcm-outline-rail";
-  rail.setAttribute("aria-hidden", "true");
 
   const label = document.createElement("span");
   label.className = "ghcm-outline-label";
   label.textContent = heading.text;
 
-  item.append(rail, label);
+  item.append(label);
   return item;
 }

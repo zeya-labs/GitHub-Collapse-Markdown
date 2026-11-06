@@ -18,16 +18,19 @@ export const panelStyles = `
   }
 
   .ghcm-trigger::before {
-    content: "▸";
-    font-size: 12px;
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
   }
 
   .ghcm-trigger:hover {
     color: var(--ghcm-accent);
   }
 
-  .ghcm-trigger.is-hidden,
-  .ghcm-inline-action.is-hidden {
+  .ghcm-trigger.is-hidden {
     display: none;
   }
 
@@ -41,7 +44,7 @@ export const panelStyles = `
     margin: 0;
     border: 0;
     padding: 0;
-    overflow: hidden;
+    overflow: visible;
     background: transparent;
     box-shadow: none;
   }
@@ -88,17 +91,9 @@ export const panelStyles = `
     background: var(--ghcm-surface);
   }
 
-  .ghcm-sidebar-shell {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
   .ghcm-sidebar-header {
     display: flex;
     flex: 0 0 auto;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--ghcm-space-1) var(--ghcm-space-2);
@@ -114,6 +109,7 @@ export const panelStyles = `
 
   .ghcm-sidebar-kicker {
     display: inline-flex;
+    flex: 1 1 auto;
     align-items: center;
     min-width: 0;
     margin: 0;
@@ -139,40 +135,101 @@ export const panelStyles = `
 
   .ghcm-sidebar-tools {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
-    flex-wrap: wrap;
-    gap: var(--ghcm-space-2);
+    gap: var(--ghcm-space-1);
   }
 
   .ghcm-inline-action {
     appearance: none;
     margin: 0;
     border: 0;
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 0;
     background: transparent;
-    color: var(--ghcm-accent);
-    font-size: 12px;
-    font-weight: 500;
+    color: var(--ghcm-ink);
+    font: inherit;
+    font-size: 13px;
     line-height: 20px;
     cursor: pointer;
-    transition: color 120ms ease;
+    transition: background-color 120ms ease;
   }
 
-  .ghcm-inline-action:hover {
-    color: var(--ghcm-ink);
-    text-decoration: underline;
-  }
-
-  .ghcm-sidebar-outline {
-    display: flex;
-    flex: 1 1 auto;
-    min-height: 0;
+  .ghcm-root .ghcm-actions {
+    position: relative;
     margin: 0;
     padding: 0;
   }
 
-  .ghcm-root.is-overlay .ghcm-sidebar-outline {
-    padding: var(--ghcm-space-2);
+  .ghcm-root .ghcm-actions-trigger,
+  .ghcm-root .ghcm-close-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    border: 0;
+    border-radius: 6px;
+    padding: 0;
+    background: transparent;
+    color: var(--ghcm-ink-soft);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .ghcm-actions-trigger::-webkit-details-marker {
+    display: none;
+  }
+
+  .ghcm-actions-trigger svg,
+  .ghcm-close-action svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+  }
+
+  .ghcm-actions-trigger:hover,
+  .ghcm-close-action:hover,
+  .ghcm-actions[open] > .ghcm-actions-trigger,
+  .ghcm-inline-action:hover {
+    background: var(--ghcm-surface-subtle);
+  }
+
+  .ghcm-actions-menu {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: calc(100% + var(--ghcm-space-1));
+    right: 0;
+    z-index: 3;
+    width: max-content;
+    min-width: 160px;
+    margin: 0;
+    border: 1px solid var(--ghcm-line);
+    border-radius: 6px;
+    padding: var(--ghcm-space-1);
+    background: var(--ghcm-surface);
+    box-shadow: var(--shadow-floating-small, 0 4px 12px rgba(31, 35, 40, 0.12));
+  }
+
+  .ghcm-actions.is-above .ghcm-actions-menu {
+    top: auto;
+    bottom: calc(100% + var(--ghcm-space-1));
+  }
+
+  .ghcm-actions-menu .ghcm-inline-action {
+    width: 100%;
+    padding: var(--ghcm-space-1) var(--ghcm-space-2);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .ghcm-root.is-overlay .ghcm-outline {
+    margin: var(--ghcm-space-2);
+  }
+
+  .ghcm-actions-menu .ghcm-inline-action:focus-visible {
+    outline-offset: -2px;
   }
 `;

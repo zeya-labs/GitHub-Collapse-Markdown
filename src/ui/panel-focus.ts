@@ -10,7 +10,7 @@ export class PanelFocus {
   private open = false;
   private returnTarget: HTMLElement | null = null;
 
-  constructor(private readonly dom: Pick<PanelDomRefs, "root" | "panel" | "trigger">) {}
+  constructor(private readonly dom: Pick<PanelDomRefs, "root" | "panel" | "trigger" | "actionsTrigger">) {}
 
   sync({ open, moveFocus, previousFocus }: PanelFocusState): void {
     const wasOpen = this.open;
@@ -18,7 +18,7 @@ export class PanelFocus {
     if (open && !wasOpen) {
       this.returnTarget = previousFocus instanceof HTMLElement ? previousFocus : null;
       if (moveFocus) {
-        (this.dom.panel.querySelector<HTMLElement>("button:not(:disabled)") ?? this.dom.panel).focus({ preventScroll: true });
+        this.dom.actionsTrigger.focus({ preventScroll: true });
       }
       return;
     }

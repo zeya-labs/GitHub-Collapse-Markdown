@@ -14,17 +14,10 @@ export const baseStyles = `
     --ghcm-ink-soft: var(--fgColor-muted, var(--color-fg-muted, #59636e));
     --ghcm-ink-muted: var(--ghcm-ink-soft);
     --ghcm-line: var(--borderColor-default, var(--color-border-default, #d0d7de));
-    --ghcm-line-muted: var(--borderColor-muted, var(--color-border-muted, #d8dee4));
     --ghcm-surface: var(--bgColor-default, var(--color-canvas-default, #ffffff));
     --ghcm-surface-subtle: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
     --ghcm-surface-accent: var(--bgColor-accent-muted, var(--color-accent-subtle, rgba(9, 105, 218, 0.08)));
     --ghcm-accent: var(--fgColor-accent, var(--color-accent-fg, #0969da));
-    --ghcm-h1: var(--ghcm-ink);
-    --ghcm-h2: var(--ghcm-ink);
-    --ghcm-h3: var(--ghcm-ink);
-    --ghcm-h4: var(--ghcm-ink-soft);
-    --ghcm-h5: var(--ghcm-ink-soft);
-    --ghcm-h6: var(--ghcm-ink-soft);
   }
 
   .ghcm-root,
@@ -38,18 +31,13 @@ export const baseStyles = `
     font-family: inherit;
   }
 
-  .ghcm-root :is(.ghcm-trigger, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
+  .ghcm-root :is(.ghcm-trigger, .ghcm-actions-trigger, .ghcm-close-action, .ghcm-inline-action, .ghcm-outline-link, .ghcm-drag-handle):focus-visible {
     outline: 2px solid var(--ghcm-accent);
     outline-offset: 2px;
   }
 
   .ghcm-root .ghcm-outline-link:focus-visible {
     outline-offset: -2px;
-  }
-
-  .ghcm-cell {
-    display: block;
-    width: 100%;
   }
 
   .ghcm-dock-row,
