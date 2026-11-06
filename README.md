@@ -1,6 +1,6 @@
 # GitHub Collapse Markdown
 
-![Version](https://img.shields.io/badge/version-5.2.4-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-5.2.5-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Userscript](https://img.shields.io/badge/userscript-Tampermonkey%2FViolentmonkey-orange.svg)
 

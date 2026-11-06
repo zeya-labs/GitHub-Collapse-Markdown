@@ -78,6 +78,31 @@ export const githubReadmePageFixture = `
   </main>
 `;
 
+// Sidebar ancestry reported by the user from their signed-in repository page.
+export const githubModuleSidebarPageFixture = `
+  <header role="banner" style="height:64px"></header>
+  <main id="repo-content-pjax-container">
+    <div class="prc-PageLayout-PageLayoutRoot--KH-d container-xl" data-component="SplitPageLayout">
+      <div class="prc-PageLayout-PageLayoutWrapper-2BhU2" style="display:flex;width:1280px">
+        <div class="prc-PageLayout-PageLayoutContent-BneH9" style="display:flex;width:1280px">
+          <section id="readme">${githubReadmeMarkdownFixture}</section>
+          <div class="prc-PageLayout-PaneWrapper-pHPop pr-2" style="display:flex;width:328px">
+            <div class="prc-PageLayout-Pane-AyzHK" data-component="SplitPageLayout.Pane" style="width:320px">
+              <div class="CodeViewSidebar-module_6TmlqG_borderGrid" style="display:grid;width:272px">
+                ${["About", "Releases", "Packages", "Contributors", "Languages"].map((title) => `
+                  <div class="SidebarSection-module_TOhNLG_sidebarSection">
+                    <h2 class="SidebarSection-module_TOhNLG_sectionHeading prc-Heading-Heading-MtWFE" data-component="Heading">${title}</h2>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+`;
+
 export const githubCommentPageFixture = `
   <header role="banner" style="height: 64px;"></header>
   <div id="pullrequest-1"></div>

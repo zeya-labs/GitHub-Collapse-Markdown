@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        GitHub Collapse Markdown
-// @version     5.2.4
+// @version     5.2.5
 // @description GitHub Markdown 标题折叠脚本，支持大纲、状态记忆与现代 GitHub 页面
 // @license     MIT
 // @author      Xyea
@@ -303,7 +303,11 @@
   ];
   var GITHUB_SIDEBAR_SELECTOR = GITHUB_SIDEBAR_SELECTORS.join(", ");
   var MODERN_PANE_SELECTOR = "[data-component='SplitPageLayout.Pane'], [class*='PageLayout-Pane-']";
-  var METADATA_GRID_SELECTOR = ".BorderGrid, [class*='borderGrid__']";
+  var METADATA_GRID_SELECTOR = [
+    ".BorderGrid",
+    "[class*='borderGrid__']",
+    "[class*='CodeViewSidebar-module_'][class*='_borderGrid']"
+  ].join(", ");
   var UNSAFE_DOCK_CONTEXT_SELECTOR = ".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']";
   function isGitHubRootHomePath(location) {
     return location.pathname === "/";
@@ -492,7 +496,7 @@
     return null;
   }
   function isMetadataSidebar(element) {
-    return !element.matches(MODERN_PANE_SELECTOR) || Boolean(element.querySelector(METADATA_GRID_SELECTOR));
+    return !element.matches(MODERN_PANE_SELECTOR) || Array.from(element.querySelectorAll(METADATA_GRID_SELECTOR)).some(isSafeDockHost);
   }
   function resolveSidebarOwner(element) {
     let sidebar = element.closest(GITHUB_SIDEBAR_SELECTOR) ?? element;

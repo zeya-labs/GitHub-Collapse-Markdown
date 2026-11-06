@@ -75,14 +75,18 @@ describe("Markdown surface discovery", () => {
 });
 
 describe("available GitHub sidebars", () => {
-  it("uses the complete modern repository metadata pane and the whole reading region", () => {
+  it.each([
+    "borderGrid__VCnF9i",
+    "CodeViewSidebar-module_6TmlqG_borderGrid",
+    "CodeViewSidebar-module_anotherHash_borderGrid"
+  ])("uses the complete modern metadata pane for %s and the whole reading region", (gridClass) => {
     document.body.innerHTML = `
       <main>
         <div class="prc-PageLayout-PageLayoutContent-BneH9" id="reading-region">
           <div data-component="SplitPageLayout.Content">${markdown}</div>
           <div class="prc-PageLayout-PaneWrapper-pHPop">
             <div data-component="SplitPageLayout.Pane" class="prc-PageLayout-Pane-AyzHK" id="sidebar" style="height:min-content">
-              <div class="borderGrid__VCnF9i">
+              <div class="${gridClass}">
                 <div class="sidebarSection__oqw6Y8"><h2>About</h2></div>
                 <div class="sidebarSection__oqw6Y8"><h2>Releases</h2></div>
                 <div class="sidebarSection__oqw6Y8"><h2>Languages</h2></div>
@@ -147,8 +151,11 @@ describe("available GitHub sidebars", () => {
 
   it.each([
     '<nav>Files</nav>',
-    '<nav><div class="BorderGrid">Files</div></nav>'
-  ])("does not mistake a modern navigation pane for repository metadata: %s", (content) => {
+    '<nav><div class="BorderGrid">Files</div></nav>',
+    '<nav><div class="CodeViewSidebar-module_6TmlqG_borderGrid">Files</div></nav>',
+    '<div class="markdown-body"><div class="CodeViewSidebar-module_6TmlqG_borderGrid">Example markup</div></div>',
+    '<div contenteditable="true"><div class="CodeViewSidebar-module_6TmlqG_borderGrid">Editor</div></div>'
+  ])("rejects metadata markup in unsafe modern pane contexts: %s", (content) => {
     document.body.innerHTML = `<div data-component="SplitPageLayout.Pane" class="prc-PageLayout-Pane-AyzHK">${content}</div>`;
     expect(githubAdapter.getDockedPanelLayout?.(document)).toBeNull();
   });

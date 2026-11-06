@@ -3,6 +3,7 @@ import { GitHubCollapseMarkdownApp } from "../src/app/app";
 import { PageSession } from "../src/app/page-session";
 import {
   githubIssueBodyNestedMarkdownFixture,
+  githubModuleSidebarPageFixture,
   githubReadmeMarkdownFixture,
   githubReadmePageFixture
 } from "./fixtures";
@@ -270,6 +271,41 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     expect(sidebar.lastElementChild).toBe(row);
     expect(row?.previousElementSibling).toBe(languages);
     expect(sidebar.contains(nativeGrid)).toBe(true);
+    expect(document.querySelector(".ghcm-root")).toBe(root);
+    expect(document.querySelector(".ghcm-heading-toggle")).toBe(headingControl);
+    expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
+  });
+
+  it.each(["initial", "hydrated"] as const)("docks contents in the user-reported sidebar with %s metadata", async (timing) => {
+    document.body.innerHTML = githubModuleSidebarPageFixture;
+    const sidebar = document.querySelector<HTMLElement>("[data-component='SplitPageLayout.Pane']")!;
+    const grid = sidebar.firstElementChild!;
+    if (timing === "hydrated") {
+      grid.remove();
+    }
+    app = new GitHubCollapseMarkdownApp();
+    app.start();
+    const root = document.querySelector<HTMLElement>(".ghcm-root")!;
+    const headingControl = document.querySelector(".ghcm-heading-toggle");
+    if (timing === "hydrated") {
+      expect(root.classList.contains("is-inline")).toBe(true);
+      sidebar.append(grid);
+      await sleep(180);
+    }
+
+    expect(root.classList.contains("is-docked")).toBe(true);
+    expect(document.querySelector("#readme .ghcm-root")).toBeNull();
+    expect(sidebar.lastElementChild).toBe(root.closest(".ghcm-dock-row"));
+    expect(root.closest(".ghcm-dock-row")?.previousElementSibling).toBe(grid);
+    expect(grid.lastElementChild?.textContent?.trim()).toBe("Languages");
+
+    const workflows = document.createElement("section");
+    workflows.innerHTML = "<h2>Suggested workflows</h2><p>Native suggestions</p>";
+    sidebar.append(workflows);
+    await sleep(180);
+
+    expect(sidebar.lastElementChild).toBe(root.closest(".ghcm-dock-row"));
+    expect(root.closest(".ghcm-dock-row")?.previousElementSibling).toBe(workflows);
     expect(document.querySelector(".ghcm-root")).toBe(root);
     expect(document.querySelector(".ghcm-heading-toggle")).toBe(headingControl);
     expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
@@ -835,8 +871,11 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     expect(preview.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(1);
   });
 
-  it("moves between a hidden sidebar and inline contents without rebuilding heading controls", async () => {
-    document.body.innerHTML = githubReadmePageFixture;
+  it.each([
+    { name: "native table", fixture: githubReadmePageFixture, host: ".BorderGrid", section: ".BorderGrid-row" },
+    { name: "user-reported sidebar", fixture: githubModuleSidebarPageFixture, host: "[data-component='SplitPageLayout.Pane']", section: ".SidebarSection-module_TOhNLG_sidebarSection" }
+  ])("moves between a hidden $name and inline contents without rebuilding heading controls", async ({ fixture, host, section }) => {
+    document.body.innerHTML = fixture;
     const mountSpy = vi.spyOn(PageSession.prototype, "mount");
     const destroySpy = vi.spyOn(PageSession.prototype, "destroy");
     app = new GitHubCollapseMarkdownApp();
@@ -846,7 +885,8 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     const toggle = document.querySelector(".ghcm-heading-toggle");
     const sidebar = document.querySelector(".prc-PageLayout-PaneWrapper-pHPop") as HTMLElement;
     const article = document.querySelector(".markdown-body") as HTMLElement;
-    const originalSidebarRow = sidebar.querySelector(".BorderGrid-row") as HTMLElement;
+    const originalSidebarRow = sidebar.querySelector(section) as HTMLElement;
+    const originalSidebarClass = originalSidebarRow.className;
     expect(root.classList.contains("is-docked")).toBe(true);
 
     sidebar.hidden = true;
@@ -861,13 +901,13 @@ describe("GitHubCollapseMarkdownApp integration", () => {
     await sleep(180);
 
     expect(root.classList.contains("is-docked")).toBe(true);
-    expect(root.closest(".BorderGrid")).toBe(sidebar.querySelector(".BorderGrid"));
+    expect(root.closest(host)).toBe(sidebar.querySelector(host));
     expect(document.querySelector(".ghcm-heading-toggle")).toBe(toggle);
     expect(document.querySelectorAll(".ghcm-root")).toHaveLength(1);
     expect(document.querySelectorAll(".ghcm-panel")).toHaveLength(1);
     expect(document.querySelectorAll(".ghcm-dock-row")).toHaveLength(1);
     expect(document.querySelectorAll(".ghcm-heading-toggle")).toHaveLength(6);
-    expect(originalSidebarRow.className).toBe("BorderGrid-row");
+    expect(originalSidebarRow.className).toBe(originalSidebarClass);
     expect(mountSpy).toHaveBeenCalledTimes(1);
     expect(destroySpy).not.toHaveBeenCalled();
   });

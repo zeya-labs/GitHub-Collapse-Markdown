@@ -25,7 +25,11 @@ const GITHUB_SIDEBAR_SELECTORS = [
 ];
 const GITHUB_SIDEBAR_SELECTOR = GITHUB_SIDEBAR_SELECTORS.join(", ");
 const MODERN_PANE_SELECTOR = "[data-component='SplitPageLayout.Pane'], [class*='PageLayout-Pane-']";
-const METADATA_GRID_SELECTOR = ".BorderGrid, [class*='borderGrid__']";
+const METADATA_GRID_SELECTOR = [
+  ".BorderGrid",
+  "[class*='borderGrid__']",
+  "[class*='CodeViewSidebar-module_'][class*='_borderGrid']"
+].join(", ");
 const UNSAFE_DOCK_CONTEXT_SELECTOR = ".ghcm-root, nav, [role='navigation'], a, button, summary, [role='button']";
 
 interface GitHubContainerDescriptor {
@@ -248,7 +252,8 @@ function resolveGitHubDockBoundary(host: HTMLElement): HTMLElement | null {
 }
 
 function isMetadataSidebar(element: HTMLElement): boolean {
-  return !element.matches(MODERN_PANE_SELECTOR) || Boolean(element.querySelector(METADATA_GRID_SELECTOR));
+  return !element.matches(MODERN_PANE_SELECTOR) ||
+    Array.from(element.querySelectorAll<HTMLElement>(METADATA_GRID_SELECTOR)).some(isSafeDockHost);
 }
 
 function resolveSidebarOwner(element: HTMLElement): HTMLElement {
